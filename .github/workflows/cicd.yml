@@ -1,0 +1,25 @@
+name: CI/CD Pipeline
+
+on: [push, pull_request]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+      - name: Build and push Docker images
+        run: |
+          docker-compose build
+      - name: Run tests
+        run: |
+          docker-compose up -d
+          sleep 10
+          docker-compose ps
+      - name: Deploy
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo Deploying to production...
+          docker-compose up -d --remove-orphans

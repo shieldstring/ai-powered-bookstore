@@ -1,6 +1,6 @@
-# AI-Powered BookStore
+# AI-Powered Social-Ecommerce Platform
 
-This monorepo contains the frontend, backend, and recommendation engine for an AI-powered BookStore.
+AI-Powered Social-Ecommerce Platform is a comprehensive system integrating eCommerce, social networking, and MLM for book sales, community engagement, and earning opportunities.
 
 ## Structure
 
