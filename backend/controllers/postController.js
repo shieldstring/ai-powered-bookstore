@@ -1,4 +1,5 @@
 const Post = require('../models/Post');
+const admin = require('../firebase');
 
 // Create a new post
 const createPost = async (req, res) => {
@@ -12,29 +13,46 @@ const createPost = async (req, res) => {
   }
 };
 
-// Like a post
+// Send a push notification
+const sendPushNotification = async (userId, message) => {
+    const user = await User.findById(userId);
+    if (user && user.fcmToken) {
+      await admin.messaging().send({
+        token: user.fcmToken,
+        notification: {
+          title: 'New Like',
+          body: message,
+        },
+      });
+    }
+  };
+
+// Like a post (with real-time notifications)
 const likePost = async (req, res) => {
-  const { postId } = req.params;
-
-  try {
-    const post = await Post.findById(postId);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
+    const { postId } = req.params;
+  
+    try {
+      const post = await Post.findById(postId);
+      if (!post) {
+        return res.status(404).json({ message: 'Post not found' });
+      }
+  
+      // Check if the user already liked the post
+      if (post.likes.includes(req.user._id)) {
+        return res.status(400).json({ message: 'Post already liked' });
+      }
+  
+      post.likes.push(req.user._id);
+      await post.save();
+  
+      // Emit a real-time notification to the post owner
+      req.io.to(post.user.toString()).emit('postLiked', { postId, userId: req.user._id });
+  
+      res.json(post);
+    } catch (error) {
+      res.status(500).json({ message: 'Server error' });
     }
-
-    // Check if the user already liked the post
-    if (post.likes.includes(req.user._id)) {
-      return res.status(400).json({ message: 'Post already liked' });
-    }
-
-    post.likes.push(req.user._id);
-    await post.save();
-
-    res.json(post);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
+  };
 
 // Add a comment to a post
 const addComment = async (req, res) => {

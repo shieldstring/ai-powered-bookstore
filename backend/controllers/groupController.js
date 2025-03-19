@@ -1,5 +1,6 @@
 const Group = require("../models/Group");
 const Discussion = require("../models/Discussion");
+const Message = require("../models/Message");
 
 // Create a new group
 const createGroup = async (req, res) => {
@@ -104,11 +105,53 @@ const deleteDiscussion = async (req, res) => {
   }
 };
 
+// Send a message to a group
+const sendGroupMessage = async (req, res) => {
+  const { groupId, content } = req.body;
+
+  try {
+    const group = await Group.findById(groupId);
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    const message = await Message.create({
+      sender: req.user._id,
+      group: groupId,
+      content,
+    });
+    res.status(201).json(message);
+
+    // Emit the message to the group via Socket.IO
+    req.io
+      .to(groupId)
+      .emit("receiveGroupMessage", { userId: req.user._id, message: content });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get messages from a group
+const getGroupMessages = async (req, res) => {
+  const { groupId } = req.params;
+
+  try {
+    const messages = await Message.find({ group: groupId }).populate(
+      "sender",
+      "name"
+    );
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   createGroup,
   addDiscussion,
   getDiscussions,
   editGroup,
   deleteGroup,
-  deleteDiscussion,
+  sendGroupMessage,
+  getGroupMessages,
 };
