@@ -12,6 +12,7 @@ const leaderboardRoutes = require('./routes/leaderboardRoutes');
 const challengeRoutes = require('./routes/challengeRoutes');
 const postRoutes = require('./routes/postRoutes');
 const messageRoutes = require('./routes/messageRoutes');
+const recommendationRoutes = require('./routes/recommendationRoutes');
 const { protect } = require('./middleware/authMiddleware');
 
 dotenv.config();
@@ -37,6 +38,7 @@ app.use('/api/leaderboard', leaderboardRoutes);
 app.use('/api/challenges', protect, challengeRoutes);
 app.use('/api/posts', protect, postRoutes);
 app.use('/api/messages', protect, messageRoutes);
+app.use('/api/recommendations', recommendationRoutes);
 
 // Socket.IO for real-time communication
 io.on('connection', (socket) => {
