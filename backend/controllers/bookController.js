@@ -109,4 +109,20 @@ const addReview = async (req, res) => {
   }
 };
 
-module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase, addReview };
+// Get a single book by ID
+const getBookById = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const book = await Book.findById(id).populate('reviews.user', 'name');
+    if (!book) {
+      return res.status(404).json({ message: 'Book not found' });
+    }
+
+    res.json(book);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase, addReview, getBookById };
