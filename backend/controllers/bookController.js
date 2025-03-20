@@ -125,4 +125,34 @@ const getBookById = async (req, res) => {
   }
 };
 
-module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase, addReview, getBookById };
+// Get AI-curated book recommendations
+const getRecommendations = async (req, res) => {
+  try {
+    // Example: Recommend books based on user's reading history (to be replaced with AI logic)
+    const recommendedBooks = await Book.find().limit(10); // Replace with AI logic
+    res.json(recommendedBooks);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Search books manually
+const searchBooks = async (req, res) => {
+  const { query } = req.query;
+
+  try {
+    const books = await Book.find({
+      $or: [
+        { title: { $regex: query, $options: 'i' } },
+        { author: { $regex: query, $options: 'i' } },
+        { genre: { $regex: query, $options: 'i' } },
+      ],
+    });
+
+    res.json(books);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase, addReview, getBookById, getRecommendations, searchBooks };
