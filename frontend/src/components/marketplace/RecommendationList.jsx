@@ -1,15 +1,17 @@
 import React, { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchRecommendations } from '../redux/actions/bookActions';
 import BookCard from './BookCard';
+import { getRecommendations } from '../../services/api';
 
 const RecommendationList = () => {
-  const dispatch = useDispatch();
-  const recommendations = useSelector((state) => state.book.recommendations);
+  const [recommendations, setRecommendations] = useState([]);
 
   useEffect(() => {
-    dispatch(fetchRecommendations());
-  }, [dispatch]);
+    const fetchRecommendations = async () => {
+      const data = await getRecommendations(userId);
+      setRecommendations(data);
+    };
+    fetchRecommendations();
+  }, [userId]);
 
   return (
     <div className="recommendation-list">

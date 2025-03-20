@@ -19,3 +19,15 @@ api.interceptors.request.use((config) => {
 });
 
 export default api;
+
+export const getRecommendations = async (userId) => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/recommendations', {
+        params: { userId },
+      });
+      return response.data.recommendations;
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      return [];
+    }
+  };

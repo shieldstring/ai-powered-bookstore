@@ -15,7 +15,6 @@ AI-Powered Social-Ecommerce Platform is a comprehensive system integrating eComm
 * Node.js and npm (or yarn)
 * Python 3.x
 * MongoDB
-* Docker (optional, but recommended)
 
 ### Setup
 
@@ -86,11 +85,3 @@ AI-Powered Social-Ecommerce Platform is a comprehensive system integrating eComm
         python app.py
         cd ..
         ```
-
-## Docker (Optional but Recommended)
-
-For Docker setup and instructions, refer to the respective `README.md` files in the `frontend/`, `backend/`, and `recommendation-engine/` directories.
-
-## Contributing
-
-...
