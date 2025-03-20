@@ -1,11 +1,15 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+
 const userSchema = mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' }, // User roles
+    profilePicture: { type: String }, // Profile picture URL
+    bio: { type: String }, // User bio
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
     tokens: { type: Number, default: 0 },
