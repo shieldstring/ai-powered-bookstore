@@ -18,6 +18,7 @@ const bookSchema = mongoose.Schema(
     image: { type: String },
     genre: { type: String },
     affiliateLink: { type: String },
+    inventory: { type: Number, default: 0 }, // Track inventory
     purchaseCount: { type: Number, default: 0 },
     reviews: [reviewSchema],
   },

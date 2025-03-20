@@ -155,4 +155,24 @@ const searchBooks = async (req, res) => {
   }
 };
 
-module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase, addReview, getBookById, getRecommendations, searchBooks };
+// Update book inventory
+const updateInventory = async (req, res) => {
+  const { id } = req.params;
+  const { inventory } = req.body;
+
+  try {
+    const book = await Book.findById(id);
+    if (!book) {
+      return res.status(404).json({ message: 'Book not found' });
+    }
+
+    book.inventory = inventory;
+    await book.save();
+
+    res.json(book);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase, addReview, getBookById, getRecommendations, searchBooks, updateInventory };
