@@ -83,4 +83,30 @@ const trackPurchase = async (req, res) => {
     }
   };
   
-  module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase };
+ // Add a review to a book
+const addReview = async (req, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+
+  try {
+    const book = await Book.findById(id);
+    if (!book) {
+      return res.status(404).json({ message: 'Book not found' });
+    }
+
+    const review = {
+      user: req.user._id,
+      rating,
+      comment,
+    };
+
+    book.reviews.push(review);
+    await book.save();
+
+    res.status(201).json(book);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase, addReview };
