@@ -43,6 +43,7 @@ const readingListRoutes = require('./routes/readingListRoutes');
 const cartRoutes = require('./routes/cartRoutes'); 
 const searchRoutes = require('./routes/searchRoutes'); 
 const orderRoutes = require('./routes/orderRoutes'); // Order routes
+const userRoutes = require('./routes/userRoutes'); // User routes
 
 // Use Routes
 app.use('/api/auth', authRoutes); // Authentication routes
@@ -62,6 +63,7 @@ app.use('/api/reading-lists', protect, readingListRoutes); // Reading lists rout
 app.use('/api/cart', protect, cartRoutes); // Cart routes
 app.use('/api/search', searchRoutes); // Global search routes
 app.use('/api/orders', protect, orderRoutes); // Order routes
+app.use('/api/users', protect, userRoutes); // User routes
 
 // Socket.IO for real-time communication
 io.on('connection', (socket) => {
