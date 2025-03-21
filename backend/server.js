@@ -40,6 +40,8 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const levelRoutes = require('./routes/levelRoutes');
 const badgeRoutes = require('./routes/badgeRoutes');
 const readingListRoutes = require('./routes/readingListRoutes');
+const cartRoutes = require('./routes/cartRoutes'); 
+const searchRoutes = require('./routes/searchRoutes'); 
 
 // Use Routes
 app.use('/api/auth', authRoutes); // Authentication routes
@@ -56,6 +58,8 @@ app.use('/api/analytics', protect, admin, analyticsRoutes); // Analytics routes 
 app.use('/api/level', protect, levelRoutes); // Leveling and XP routes
 app.use('/api/badges', protect, badgeRoutes); // Badges and achievements routes
 app.use('/api/reading-lists', protect, readingListRoutes); // Reading lists routes
+app.use('/api/cart', protect, cartRoutes); // Cart routes
+app.use('/api/search', searchRoutes); // Global search routes
 
 // Socket.IO for real-time communication
 io.on('connection', (socket) => {

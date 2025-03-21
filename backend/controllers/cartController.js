@@ -34,6 +34,36 @@ const addToCart = async (req, res) => {
   }
 };
 
+// Remove a book from the cart
+const removeFromCart = async (req, res) => {
+  const { bookId } = req.params;
+
+  try {
+    const cart = await Cart.findOne({ user: req.user._id });
+    if (!cart) {
+      return res.status(404).json({ message: 'Cart not found' });
+    }
+
+    cart.items = cart.items.filter((item) => item.book.toString() !== bookId);
+    await cart.save();
+
+    res.json(cart);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get the user's cart
+const getCart = async (req, res) => {
+  try {
+    const cart = await Cart.findOne({ user: req.user._id }).populate('items.book');
+    res.json(cart);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
 // Process an order
 const processOrder = async (req, res) => {
   const { cartId } = req.body;
@@ -59,4 +89,4 @@ const processOrder = async (req, res) => {
   }
 };
 
-module.exports = { addToCart, processOrder };
+module.exports = { addToCart, processOrder, removeFromCart, getCart };

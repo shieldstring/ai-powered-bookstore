@@ -154,4 +154,5 @@ module.exports = {
   deleteGroup,
   sendGroupMessage,
   getGroupMessages,
+  deleteDiscussion,
 };
