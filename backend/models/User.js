@@ -7,9 +7,11 @@ const userSchema = mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['user', 'admin'], default: 'user' }, // User roles
-    profilePicture: { type: String }, // Profile picture URL
-    bio: { type: String }, // User bio
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    profilePicture: { type: String },
+    bio: { type: String },
+    level: { type: Number, default: 1 }, // User level
+    xp: { type: Number, default: 0 }, // Experience points
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
     tokens: { type: Number, default: 0 },
