@@ -25,4 +25,8 @@ const bookSchema = mongoose.Schema(
   { timestamps: true }
 );
 
+// Add indexes for frequently queried fields
+bookSchema.index({ title: 1 }); // Index for title
+bookSchema.index({ genre: 1 }); // Index for genre
+
 module.exports = mongoose.model('Book', bookSchema);

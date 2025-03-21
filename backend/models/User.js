@@ -39,4 +39,8 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// Add indexes for frequently queried fields
+userSchema.index({ email: 1 }); // Index for email
+userSchema.index({ name: 1 }); // Index for name
+
 module.exports = mongoose.model('User', userSchema);
