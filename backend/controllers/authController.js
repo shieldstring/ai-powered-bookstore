@@ -42,6 +42,11 @@ const loginUser = async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
+    // Update last login and login history
+    user.lastLogin = new Date();
+    user.loginHistory.push(new Date());
+    await user.save();
+
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: '30d',

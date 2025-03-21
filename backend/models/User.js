@@ -18,6 +18,9 @@ const userSchema = mongoose.Schema(
     referralCode: { type: String, unique: true },
     referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     earnings: { type: Number, default: 0 },
+    lastLogin: { type: Date }, // Track last login
+    loginHistory: [{ type: Date }], // Track login history
+    purchaseHistory: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }], // Track purchases
   },
   { timestamps: true }
 );
