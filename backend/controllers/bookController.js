@@ -175,4 +175,27 @@ const updateInventory = async (req, res) => {
   }
 };
 
-module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase, addReview, getBookById, getRecommendations, searchBooks, updateInventory };
+// Bulk delete books
+const bulkDeleteBooks = async (req, res) => {
+  const { bookIds } = req.body;
+
+  try {
+    await Book.deleteMany({ _id: { $in: bookIds } });
+    res.json({ message: 'Books deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Bulk update inventory
+const bulkUpdateInventory = async (req, res) => {
+  const { bookIds, inventory } = req.body;
+
+  try {
+    await Book.updateMany({ _id: { $in: bookIds } }, { $set: { inventory } });
+    res.json({ message: 'Inventory updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+module.exports = { getBooks, addBook, editBook, deleteBook, trackPurchase, addReview, getBookById, getRecommendations, searchBooks, updateInventory, bulkDeleteBooks, bulkUpdateInventory };
