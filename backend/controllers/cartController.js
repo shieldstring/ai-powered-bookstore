@@ -1,6 +1,6 @@
 const Cart = require('../models/Cart');
 const Book = require('../models/Book');
-const Order = require('../models/Order');
+
 
 // Add a book to the cart
 const addToCart = async (req, res) => {
@@ -64,29 +64,6 @@ const getCart = async (req, res) => {
 };
 
 
-// Process an order
-const processOrder = async (req, res) => {
-  const { cartId } = req.body;
 
-  try {
-    const cart = await Cart.findById(cartId).populate('items.book');
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
 
-    // Calculate total price
-    const totalPrice = cart.items.reduce((total, item) => total + item.book.price * item.quantity, 0);
-
-    // Create an order
-    const order = await Order.create({ user: req.user._id, items: cart.items, totalPrice });
-
-    // Clear the cart
-    await Cart.findByIdAndDelete(cartId);
-
-    res.json(order);
-  } catch (error) {
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-module.exports = { addToCart, processOrder, removeFromCart, getCart };
+module.exports = { addToCart, removeFromCart, getCart };
