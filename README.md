@@ -1,87 +1,21 @@
-# AI-Powered Social-Ecommerce Platform
-
-AI-Powered Social-Ecommerce Platform is a comprehensive system integrating eCommerce, social networking, and MLM for book sales, community engagement, and earning opportunities.
-
-## Structure
-
-* `frontend/`: React frontend.
-* `backend/`: Node.js backend.
-* `recommendation-engine/`: Python recommendation engine.
+# Backend
 
 ## Getting Started
 
-### Prerequisites
-
-* Node.js and npm (or yarn)
-* Python 3.x
-* MongoDB
-
-### Setup
-
-1.  **Clone the repository:**
+1.  **Install dependencies:**
 
     ```bash
-    git clone <repository_url>
-    cd ai-powered-bookstore
+    npm install
     ```
 
-2.  **Install dependencies:**
+2.  **Run the development server:**
 
-    * **Frontend:**
+    ```bash
+    npm run dev
+    ```
 
-        ```bash
-        cd frontend
-        npm install
-        cd ..
-        ```
+3.  **Run the production server:**
 
-    * **Backend:**
-
-        ```bash
-        cd backend
-        npm install
-        cd ..
-        ```
-
-    * **Recommendation Engine:**
-
-        ```bash
-        cd recommendation-engine
-        python3 -m venv venv
-        source venv/bin/activate  # On macOS/Linux
-        #venv\Scripts\activate #On Windows
-        pip install -r requirements.txt
-        cd ..
-        ```
-
-3.  **Configure environment variables:**
-
-    * Create `.env` files in `backend/` and `frontend/` as needed.
-    * Configure MongoDB connection in `backend/config/config.js` or `.env`.
-
-4.  **Run the applications:**
-
-    * **Backend:**
-
-        ```bash
-        cd backend
-        npm run dev #or npm run start
-        cd ..
-        ```
-
-    * **Frontend:**
-
-        ```bash
-        cd frontend
-        npm start
-        cd ..
-        ```
-
-    * **Recommendation Engine:**
-
-        ```bash
-        cd recommendation-engine
-        source venv/bin/activate
-        python app.py
-        cd ..
-        ```
+    ```bash
+    npm start
+    ```
