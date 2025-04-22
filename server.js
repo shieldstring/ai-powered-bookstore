@@ -8,8 +8,9 @@ const { protect, admin } = require('./middleware/authMiddleware');
 // Load environment variables
 dotenv.config();
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB database and populate with sample data in development
+const populateData = process.env.NODE_ENV === 'development';
+connectDB(populateData);
 
 // Initialize Express app
 const app = express();
