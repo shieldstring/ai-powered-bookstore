@@ -22,7 +22,6 @@ const addBook = async (req, res) => {
   }
 };
 
-e('../models/Book');
 
 // Edit a book
 const editBook = async (req, res) => {
