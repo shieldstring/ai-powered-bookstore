@@ -48,7 +48,7 @@ const userRoutes = require('./routes/userRoutes'); // User routes
 
 // Use Routes
 app.use('/api/auth', authRoutes); // Authentication routes
-app.use('/api/books', protect, bookRoutes); // Book-related routes
+app.use('/api/books', bookRoutes); // Book-related routes
 app.use('/api/groups', protect, groupRoutes); // Group-related routes
 app.use('/api/mlm', protect, mlmRoutes); // MLM-related routes
 app.use('/api/payment', protect, paymentRoutes); // Payment-related routes
