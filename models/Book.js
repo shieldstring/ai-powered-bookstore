@@ -1,8 +1,8 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const reviewSchema = mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },
     comment: { type: String },
   },
@@ -16,7 +16,8 @@ const bookSchema = mongoose.Schema(
     description: { type: String },
     price: { type: Number, required: true },
     image: { type: String },
-    genre: { type: String },
+    tag: { type: String },
+    category: { type: String },
     affiliateLink: { type: String },
     inventory: { type: Number, default: 0 }, // Track inventory
     purchaseCount: { type: Number, default: 0 },
@@ -27,6 +28,6 @@ const bookSchema = mongoose.Schema(
 
 // Add indexes for frequently queried fields
 bookSchema.index({ title: 1 }); // Index for title
-bookSchema.index({ genre: 1 }); // Index for genre
+bookSchema.index({ category: 1 }); // Index for category
 
-module.exports = mongoose.model('Book', bookSchema);
+module.exports = mongoose.model("Book", bookSchema);

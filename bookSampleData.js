@@ -8,8 +8,10 @@ const bookSampleData = [
     description:
       "Between life and death there is a library, and within that library, the shelves go on forever. Every book provides a chance to try another life you could have lived.",
     price: 24.99,
-    image: "https://example.com/midnight-library.jpg",
-    genre: "Fiction",
+    image:
+      "https://img1.od-cdn.com/ImageType-100/0293-1/%7BEB3594ED-AC51-4EF3-B21A-F8E7C4B77E8A%7DImg100.jpg",
+    tag: "BEST SELLER",
+    category: "Fiction",
     affiliateLink: "https://bookstore.com/midnight-library",
     inventory: 45,
     purchaseCount: 1289,
@@ -40,8 +42,10 @@ const bookSampleData = [
     description:
       "How computer algorithms can be applied to our everyday lives, helping to solve common decision-making problems.",
     price: 19.99,
-    image: "https://example.com/algorithms-live-by.jpg",
-    genre: "Non-fiction",
+    image:
+      "https://sanfranciscobookreview.com/wp-content/uploads/2016/06/algorithms_to_live_by.jpg",
+    tag: "BEST SELLER",
+    category: "Non-fiction",
     affiliateLink: "https://bookstore.com/algorithms-live-by",
     inventory: 32,
     purchaseCount: 785,
@@ -64,8 +68,10 @@ const bookSampleData = [
     description:
       "Set on the desert planet Arrakis, Dune is the story of the boy Paul Atreides, heir to a noble family tasked with ruling an inhospitable world.",
     price: 17.99,
-    image: "https://example.com/dune.jpg",
-    genre: "Science Fiction",
+    image:
+      "https://i.pinimg.com/originals/1c/2d/4b/1c2d4b6633bc681f44a05095d8a6ddb0.jpg",
+    tag: "",
+    category: "Science Fiction",
     affiliateLink: "https://bookstore.com/dune",
     inventory: 78,
     purchaseCount: 3421,
@@ -103,8 +109,10 @@ const bookSampleData = [
     description:
       "An easy and proven way to build good habits and break bad ones.",
     price: 15.99,
-    image: "https://example.com/atomic-habits.jpg",
-    genre: "Self-help",
+    image:
+      "https://jamesclear.com/wp-content/uploads/2021/08/atomic-habits-dots-1.png",
+    tag: "BEST SELLER",
+    category: "Self-help",
     affiliateLink: "https://bookstore.com/atomic-habits",
     inventory: 120,
     purchaseCount: 5231,
@@ -135,8 +143,9 @@ const bookSampleData = [
     description:
       "A psychological thriller about a woman's act of violence against her husband—and her refusal to speak about it afterward.",
     price: 14.99,
-    image: "https://example.com/silent-patient.jpg",
-    genre: "Thriller",
+    image: "https://m.media-amazon.com/images/I/91BbLCJOruL.jpg",
+    tag: "BEST SELLER",
+    category: "Thriller",
     affiliateLink: "https://bookstore.com/silent-patient",
     inventory: 23,
     purchaseCount: 2187,
@@ -165,8 +174,9 @@ const bookSampleData = [
     description:
       "A memoir about a woman who grew up in a survivalist family in Idaho and her journey to education.",
     price: 16.99,
-    image: "https://example.com/educated.jpg",
-    genre: "Memoir",
+    image: "https://cdn2.penguin.com.au/covers/original/9780099511021.jpg",
+    tag: "BEST SELLER",
+    category: "Memoir",
     affiliateLink: "https://bookstore.com/educated",
     inventory: 41,
     purchaseCount: 1823,
@@ -189,8 +199,10 @@ const bookSampleData = [
     description:
       "A lone astronaut must save the earth from disaster in this new adventure from the author of The Martian.",
     price: 22.99,
-    image: "https://example.com/project-hail-mary.jpg",
-    genre: "Science Fiction",
+    image:
+      "https://planetary.s3.amazonaws.com/web/assets/pictures/project-hail-mary-cover-weir.jpg",
+    tag: "",
+    category: "Science Fiction",
     affiliateLink: "https://bookstore.com/project-hail-mary",
     inventory: 52,
     purchaseCount: 1562,
@@ -221,8 +233,10 @@ const bookSampleData = [
     description:
       "Timeless lessons on wealth, greed, and happiness, exploring how money moves around in an economy and how people think about it.",
     price: 18.99,
-    image: "https://example.com/psychology-money.jpg",
-    genre: "Finance",
+    image:
+      "https://i.pinimg.com/736x/e6/a2/c6/e6a2c6b650e79f1095f381f54a8bab69.jpg",
+    tag: "BEST SELLER",
+    category: "Finance",
     affiliateLink: "https://bookstore.com/psychology-money",
     inventory: 67,
     purchaseCount: 2913,
@@ -253,8 +267,10 @@ const bookSampleData = [
     description:
       "A novel about an abandoned girl who raised herself in the marshes of North Carolina.",
     price: 15.99,
-    image: "https://example.com/crawdads.jpg",
-    genre: "Fiction",
+    image:
+      "https://s26162.pcdn.co/wp-content/uploads/sites/2/2018/08/where-the-crawdads-sing.jpg",
+    tag: "BEST SELLER",
+    category: "Fiction",
     affiliateLink: "https://bookstore.com/crawdads",
     inventory: 29,
     purchaseCount: 3542,
@@ -277,8 +293,9 @@ const bookSampleData = [
     description:
       "A story of love, heroism, and hope, set during the Great Depression and the Dust Bowl era.",
     price: 18.99,
-    image: "https://example.com/four-winds.jpg",
-    genre: "Historical Fiction",
+    image: "https://m.media-amazon.com/images/I/71jAoWfIgmL._SL1500_.jpg",
+    tag: "BEST SELLER",
+    category: "Historical Fiction",
     affiliateLink: "https://bookstore.com/four-winds",
     inventory: 34,
     purchaseCount: 1765,
