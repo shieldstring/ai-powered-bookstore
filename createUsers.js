@@ -16,9 +16,8 @@ async function createUsers() {
     await connectDB();
 
     // Hash passwords
-    const salt = await bcrypt.genSalt(10);
-    const adminPassword = await bcrypt.hash("securepassword123", salt);
-    const userPassword = await bcrypt.hash("userpassword123", salt);
+    const adminPassword = "securepassword123";
+    const userPassword = "userpassword123";
 
     // Sample user data
     const userData = [

@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const { protect, admin } = require('./middleware/authMiddleware');
+const cors = require('cors');
 
 // Load environment variables
 dotenv.config();
@@ -11,6 +12,9 @@ dotenv.config();
 // Connect to MongoDB database and populate with sample data in development
 const populateData = process.env.NODE_ENV === 'development';
 connectDB(populateData);
+
+// Enable CORS for all origins for your Express API (update in production as needed)
+app.use(cors());
 
 // Initialize Express app
 const app = express();
