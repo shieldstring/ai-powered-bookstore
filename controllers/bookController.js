@@ -1,6 +1,6 @@
 const Book = require('../models/Book');
 
-// Get all books with filtering and pagination
+// Get all books with limited details (including rating and reviewCount)
 const getBooks = async (req, res) => {
   try {
     // Extract query parameters
@@ -44,7 +44,8 @@ const getBooks = async (req, res) => {
           sortOption = { createdAt: -1 };
           break;
         case 'rating':
-          sortOption = { rating: -1 };
+          // For rating sort, we'll handle it after fetching the books
+          sortOption = { createdAt: -1 };
           break;
         case 'bestseller':
           sortOption = { purchaseCount: -1 };
@@ -65,21 +66,51 @@ const getBooks = async (req, res) => {
     });
     
     // Get books with pagination
-    const books = await Book.find({
+    let books = await Book.find({
       ...keyword,
       ...category,
       ...author,
       ...priceFilter
     })
-      .select('title author price originalPrice image rating tag description reviewCount')
       .sort(sortOption)
       .limit(pageSize)
-      .skip(pageSize * (page - 1))
-      .lean();
+      .skip(pageSize * (page - 1));
+    
+    // Map books to include only the fields we want
+    const formattedBooks = books.map(book => {
+      // Calculate rating manually from reviews
+      let rating = 0;
+      if (book.reviews && book.reviews.length > 0) {
+        const totalRating = book.reviews.reduce((sum, review) => sum + review.rating, 0);
+        rating = parseFloat((totalRating / book.reviews.length).toFixed(1));
+      }
+      
+      // Get review count
+      const reviewCount = book.reviews ? book.reviews.length : 0;
+      
+      // Return simplified book object
+      return {
+        _id: book._id,
+        title: book.title,
+        author: book.author,
+        price: book.price,
+        originalPrice: book.originalPrice,
+        image: book.image,
+        tag: book.tag,
+        category: book.category,
+        rating,
+        reviewCount
+      };
+    });
+    
+    // Handle special case for rating sort
+    if (req.query.sort === 'rating') {
+      formattedBooks.sort((a, b) => b.rating - a.rating);
+    }
     
     // Return response with pagination info
     res.json({
-      books,
+      books: formattedBooks,
       page,
       pages: Math.ceil(count / pageSize),
       totalBooks: count
@@ -89,6 +120,7 @@ const getBooks = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 // Add a new book
 const addBook = async (req, res) => {
