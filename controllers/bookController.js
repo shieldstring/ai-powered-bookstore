@@ -1,11 +1,91 @@
 const Book = require('../models/Book');
 
-// Get all books
+// Get all books with filtering and pagination
 const getBooks = async (req, res) => {
   try {
-    const books = await Book.find({});
-    res.json(books);
+    // Extract query parameters
+    const pageSize = Number(req.query.limit) || 10;
+    const page = Number(req.query.page) || 1;
+    const keyword = req.query.keyword
+      ? {
+          title: {
+            $regex: req.query.keyword,
+            $options: 'i',
+          },
+        }
+      : {};
+    
+    // Category filter
+    const category = req.query.category ? { category: req.query.category } : {};
+    
+    // Author filter
+    const author = req.query.author ? { author: req.query.author } : {};
+    
+    // Price range filter
+    const priceFilter = {};
+    if (req.query.minPrice) {
+      priceFilter.price = { ...priceFilter.price, $gte: Number(req.query.minPrice) };
+    }
+    if (req.query.maxPrice) {
+      priceFilter.price = { ...priceFilter.price, $lte: Number(req.query.maxPrice) };
+    }
+    
+    // Sort options
+    let sortOption = {};
+    if (req.query.sort) {
+      switch (req.query.sort) {
+        case 'price-asc':
+          sortOption = { price: 1 };
+          break;
+        case 'price-desc':
+          sortOption = { price: -1 };
+          break;
+        case 'newest':
+          sortOption = { createdAt: -1 };
+          break;
+        case 'rating':
+          sortOption = { rating: -1 };
+          break;
+        case 'bestseller':
+          sortOption = { purchaseCount: -1 };
+          break;
+        default:
+          sortOption = { createdAt: -1 };
+      }
+    } else {
+      sortOption = { createdAt: -1 }; // Default sorting
+    }
+    
+    // Count total books that match the query
+    const count = await Book.countDocuments({
+      ...keyword,
+      ...category,
+      ...author,
+      ...priceFilter
+    });
+    
+    // Get books with pagination
+    const books = await Book.find({
+      ...keyword,
+      ...category,
+      ...author,
+      ...priceFilter
+    })
+      .select('title author price originalPrice image rating tag description reviewCount')
+      .sort(sortOption)
+      .limit(pageSize)
+      .skip(pageSize * (page - 1))
+      .lean();
+    
+    // Return response with pagination info
+    res.json({
+      books,
+      page,
+      pages: Math.ceil(count / pageSize),
+      totalBooks: count
+    });
   } catch (error) {
+    console.error('Error fetching books:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
