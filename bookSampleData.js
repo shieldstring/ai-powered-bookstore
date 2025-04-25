@@ -8,6 +8,12 @@ const bookSampleData = [
     description:
       "Between life and death there is a library, and within that library, the shelves go on forever. Every book provides a chance to try another life you could have lived.",
     price: 24.99,
+    originalPrice: 29.99,
+    isbn: "9780525559474",
+    language: "English",
+    format: "Hardcover, 304 pages",
+    publishDate: new Date("2020-09-29"),
+    publisher: "Viking",
     image:
       "https://img1.od-cdn.com/ImageType-100/0293-1/%7BEB3594ED-AC51-4EF3-B21A-F8E7C4B77E8A%7DImg100.jpg",
     tag: "BEST SELLER",
@@ -42,6 +48,12 @@ const bookSampleData = [
     description:
       "How computer algorithms can be applied to our everyday lives, helping to solve common decision-making problems.",
     price: 19.99,
+    originalPrice: 25.99,
+    isbn: "9781627790369",
+    language: "English",
+    format: "Hardcover, 368 pages",
+    publishDate: new Date("2016-04-19"),
+    publisher: "Henry Holt and Co.",
     image:
       "https://sanfranciscobookreview.com/wp-content/uploads/2016/06/algorithms_to_live_by.jpg",
     tag: "BEST SELLER",
@@ -68,6 +80,12 @@ const bookSampleData = [
     description:
       "Set on the desert planet Arrakis, Dune is the story of the boy Paul Atreides, heir to a noble family tasked with ruling an inhospitable world.",
     price: 17.99,
+    originalPrice: 21.99,
+    isbn: "9780441172719",
+    language: "English",
+    format: "Mass Market Paperback, 896 pages",
+    publishDate: new Date("1990-09-01"),
+    publisher: "Ace Books",
     image:
       "https://i.pinimg.com/originals/1c/2d/4b/1c2d4b6633bc681f44a05095d8a6ddb0.jpg",
     tag: "",
@@ -109,6 +127,12 @@ const bookSampleData = [
     description:
       "An easy and proven way to build good habits and break bad ones.",
     price: 15.99,
+    originalPrice: 19.99,
+    isbn: "9780735211292",
+    language: "English",
+    format: "Hardcover, 320 pages",
+    publishDate: new Date("2018-10-16"),
+    publisher: "Avery",
     image:
       "https://jamesclear.com/wp-content/uploads/2021/08/atomic-habits-dots-1.png",
     tag: "BEST SELLER",
@@ -143,6 +167,12 @@ const bookSampleData = [
     description:
       "A psychological thriller about a woman's act of violence against her husband—and her refusal to speak about it afterward.",
     price: 14.99,
+    originalPrice: 17.99,
+    isbn: "9781250301697",
+    language: "English",
+    format: "Hardcover, 336 pages",
+    publishDate: new Date("2019-02-05"),
+    publisher: "Celadon Books",
     image: "https://m.media-amazon.com/images/I/91BbLCJOruL.jpg",
     tag: "BEST SELLER",
     category: "Thriller",
@@ -174,6 +204,12 @@ const bookSampleData = [
     description:
       "A memoir about a woman who grew up in a survivalist family in Idaho and her journey to education.",
     price: 16.99,
+    originalPrice: 20.99,
+    isbn: "9780399590504",
+    language: "English",
+    format: "Hardcover, 352 pages",
+    publishDate: new Date("2018-02-20"),
+    publisher: "Random House",
     image: "https://cdn2.penguin.com.au/covers/original/9780099511021.jpg",
     tag: "BEST SELLER",
     category: "Memoir",
@@ -199,6 +235,12 @@ const bookSampleData = [
     description:
       "A lone astronaut must save the earth from disaster in this new adventure from the author of The Martian.",
     price: 22.99,
+    originalPrice: 28.99,
+    isbn: "9780593135204",
+    language: "English",
+    format: "Hardcover, 496 pages",
+    publishDate: new Date("2021-05-04"),
+    publisher: "Ballantine Books",
     image:
       "https://planetary.s3.amazonaws.com/web/assets/pictures/project-hail-mary-cover-weir.jpg",
     tag: "",
@@ -233,6 +275,12 @@ const bookSampleData = [
     description:
       "Timeless lessons on wealth, greed, and happiness, exploring how money moves around in an economy and how people think about it.",
     price: 18.99,
+    originalPrice: 22.99,
+    isbn: "9780857197689",
+    language: "English",
+    format: "Paperback, 256 pages",
+    publishDate: new Date("2020-09-08"),
+    publisher: "Harriman House",
     image:
       "https://i.pinimg.com/736x/e6/a2/c6/e6a2c6b650e79f1095f381f54a8bab69.jpg",
     tag: "BEST SELLER",
@@ -267,6 +315,12 @@ const bookSampleData = [
     description:
       "A novel about an abandoned girl who raised herself in the marshes of North Carolina.",
     price: 15.99,
+    originalPrice: 18.99,
+    isbn: "9780735219090",
+    language: "English",
+    format: "Hardcover, 384 pages",
+    publishDate: new Date("2018-08-14"),
+    publisher: "G.P. Putnam's Sons",
     image:
       "https://s26162.pcdn.co/wp-content/uploads/sites/2/2018/08/where-the-crawdads-sing.jpg",
     tag: "BEST SELLER",
@@ -293,6 +347,12 @@ const bookSampleData = [
     description:
       "A story of love, heroism, and hope, set during the Great Depression and the Dust Bowl era.",
     price: 18.99,
+    originalPrice: 22.99,
+    isbn: "9781250178602",
+    language: "English",
+    format: "Hardcover, 464 pages",
+    publishDate: new Date("2021-02-02"),
+    publisher: "St. Martin's Press",
     image: "https://m.media-amazon.com/images/I/71jAoWfIgmL._SL1500_.jpg",
     tag: "BEST SELLER",
     category: "Historical Fiction",
