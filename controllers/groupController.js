@@ -18,6 +18,29 @@ const createGroup = async (req, res) => {
   }
 };
 
+// Get all groups
+const getAllGroups = async (req, res) => {
+  try {
+    const groups = await Group.find({}).populate("members", "name");
+    res.json(groups);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get groups a user belongs to
+const getUserGroups = async (req, res) => {
+  try {
+    const groups = await Group.find({ members: req.user._id }).populate(
+      "members",
+      "name"
+    );
+    res.json(groups);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Edit a group
 const editGroup = async (req, res) => {
   const { id } = req.params;
@@ -148,6 +171,8 @@ const getGroupMessages = async (req, res) => {
 
 module.exports = {
   createGroup,
+  getAllGroups,
+  getUserGroups,
   addDiscussion,
   getDiscussions,
   editGroup,

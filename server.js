@@ -53,11 +53,11 @@ const userRoutes = require("./routes/userRoutes"); // User routes
 // Use Routes
 app.use("/api/auth", authRoutes); // Authentication routes
 app.use("/api/books", bookRoutes); // Book-related routes
-app.use("/api/groups", protect, groupRoutes); // Group-related routes
+app.use("/api/groups", groupRoutes); // Group-related routes
 app.use("/api/mlm", protect, mlmRoutes); // MLM-related routes
 app.use("/api/payment", protect, paymentRoutes); // Payment-related routes
 app.use("/api/leaderboard", leaderboardRoutes); // Leaderboard routes
-app.use("/api/challenges", protect, challengeRoutes); // Challenge routes
+app.use("/api/challenges", challengeRoutes); // Challenge routes
 app.use("/api/posts", protect, postRoutes); // Post-related routes
 app.use("/api/messages", protect, messageRoutes); // Private messaging routes
 app.use("/api/recommendations", recommendationRoutes); // Recommendation routes

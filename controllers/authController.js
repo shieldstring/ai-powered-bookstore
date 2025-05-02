@@ -81,7 +81,7 @@ const forgotPassword = async (req, res) => {
     await user.save();
 
     // Send email with reset link
-    const resetUrl = `http://localhost:3000/reset-password/${resetToken}`;
+    const resetUrl = `https://ai-bookstore.vercel.app/reset-password/${resetToken}`;
     const message = `You are receiving this email because you requested a password reset. Please click the link to reset your password: ${resetUrl}`;
 
     await sendEmail({
