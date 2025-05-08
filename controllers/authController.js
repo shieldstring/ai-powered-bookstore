@@ -12,20 +12,43 @@ const registerUser = async (req, res) => {
     if (userExists) {
       return res.status(400).json({ message: "User already exists" });
     }
-    const user = await User.create({ name, email, password, referralCode });
+
+    // Create user data object
+    const userData = { name, email, password };
+
+    // Handle referral code if provided
+    if (referralCode && referralCode.trim() !== "") {
+      // Check if the referral code exists
+      const referrer = await User.findOne({ referralCode });
+      if (referrer) {
+        userData.referredBy = referrer._id;
+      } else {
+        // If you want to return an error for invalid referral code, uncomment below
+        return res.status(400).json({ message: "Invalid referral code" });
+      }
+    }
+
+    // Generate a unique referral code for the new user
+    userData.referralCode = crypto.randomBytes(4).toString("hex");
+
+    const user = await User.create(userData);
+
     // Generate JWT token
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "30d",
     });
+
     res.status(201).json({
       _id: user._id,
       name: user.name,
       email: user.email,
-      role: user.role, // Add the user role to the response
+      role: user.role,
+      referralCode: user.referralCode,
       token,
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Registration error:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
