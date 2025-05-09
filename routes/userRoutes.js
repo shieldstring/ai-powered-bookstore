@@ -12,13 +12,15 @@ const {
   updateNotificationPreferences,
   getFcmTokens,
 } = require("../controllers/userController");
+const { getReferralStats } = require("../controllers/authController");
 
 const router = express.Router();
 
 // User profile routes
 router.get("/profile", protect, getUserProfile); // Get the logged-in user's profile
 router.put("/profile", protect, updateProfile); // Update user profile
-
+// Referral routes
+router.get('/referral-stats', protect, getReferralStats);
 // Admin routes
 router.get("/", protect, admin, getAllUsers); // Get all users (admin only)
 router.get("/:id", protect, admin, getUserById); // Get a single user by ID (admin only)

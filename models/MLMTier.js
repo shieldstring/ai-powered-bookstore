@@ -1,12 +1,27 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const mlmTierSchema = mongoose.Schema(
   {
-    tier: { type: Number, required: true }, // Tier level (1, 2, 3, etc.)
-    commissionRate: { type: Number, required: true }, // Commission rate for this tier
-    minEarnings: { type: Number, required: true }, // Minimum earnings required to reach this tier
+    tier: {
+      type: Number,
+      required: true,
+      unique: true,
+    },
+    name: {
+      type: String,
+      required: true,
+    },
+    commissionRate: {
+      type: Number,
+      required: true,
+    },
+    minEarnings: {
+      type: Number,
+      required: true,
+    },
+    benefits: [String],
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model('MLMTier', mlmTierSchema);
+module.exports = mongoose.model("MLMTier", mlmTierSchema);
