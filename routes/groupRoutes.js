@@ -8,9 +8,11 @@ const {
   getDiscussions,
   editGroup,
   deleteGroup,
-  sendGroupMessage,
-  getGroupMessages,
   deleteDiscussion,
+  likeDiscussion,
+  unlikeDiscussion,
+  addCommentToDiscussion,
+  deleteComment,
 } = require("../controllers/groupController");
 
 const router = express.Router();
@@ -27,8 +29,18 @@ router.post("/discussions", protect, addDiscussion);
 router.get("/:groupId/discussions", protect, getDiscussions);
 router.delete("/discussions/:id", protect, deleteDiscussion); // Delete a discussion
 
-// Message routes
-router.post("/:groupId/messages", protect, sendGroupMessage); // Send a message to a group
-router.get("/:groupId/messages", protect, getGroupMessages); // Get messages from a group
+// Discussion interaction routes
+router.post("/discussions/:discussionId/like", protect, likeDiscussion); // Like a discussion
+router.delete("/discussions/:discussionId/like", protect, unlikeDiscussion); // Unlike a discussion
+router.post(
+  "/discussions/:discussionId/comments",
+  protect,
+  addCommentToDiscussion
+); // Add comment to discussion
+router.delete(
+  "/discussions/:discussionId/comments/:commentId",
+  protect,
+  deleteComment
+); // Delete a comment
 
 module.exports = router;

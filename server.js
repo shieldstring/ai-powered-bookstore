@@ -38,7 +38,6 @@ const mlmRoutes = require("./routes/mlmRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
 const challengeRoutes = require("./routes/challengeRoutes");
-const postRoutes = require("./routes/postRoutes");
 const messageRoutes = require("./routes/messageRoutes");
 const recommendationRoutes = require("./routes/recommendationRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
@@ -49,6 +48,7 @@ const cartRoutes = require("./routes/cartRoutes");
 const searchRoutes = require("./routes/searchRoutes");
 const orderRoutes = require("./routes/orderRoutes"); // Order routes
 const userRoutes = require("./routes/userRoutes"); // User routes
+const notificationRoutes = require("./routes/notificationRoutes");
 
 // Use Routes
 app.use("/api/auth", authRoutes); // Authentication routes
@@ -58,7 +58,6 @@ app.use("/api/mlm", protect, mlmRoutes); // MLM-related routes
 app.use("/api/payment", protect, paymentRoutes); // Payment-related routes
 app.use("/api/leaderboard", leaderboardRoutes); // Leaderboard routes
 app.use("/api/challenges", challengeRoutes); // Challenge routes
-app.use("/api/posts", protect, postRoutes); // Post-related routes
 app.use("/api/messages", protect, messageRoutes); // Private messaging routes
 app.use("/api/recommendations", recommendationRoutes); // Recommendation routes
 app.use("/api/analytics", protect, admin, analyticsRoutes); // Analytics routes (admin only)
@@ -69,6 +68,7 @@ app.use("/api/cart", protect, cartRoutes); // Cart routes
 app.use("/api/search", searchRoutes); // Global search routes
 app.use("/api/orders", protect, orderRoutes); // Order routes
 app.use("/api/users", protect, userRoutes); // User routes
+app.use("/api/notifications", notificationRoutes);
 
 // Socket.IO for real-time communication
 io.on("connection", (socket) => {
