@@ -50,6 +50,7 @@ const userSchema = mongoose.Schema(
   {
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
+    phone: { type: String },
     password: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
     profilePicture: { type: String },
@@ -63,7 +64,6 @@ const userSchema = mongoose.Schema(
     // Referral system fields
     referralCode: {
       type: String,
-      // Removed unique and sparse options as they'll be defined in the schema.index()
     },
     referredBy: {
       type: mongoose.Schema.Types.ObjectId,
