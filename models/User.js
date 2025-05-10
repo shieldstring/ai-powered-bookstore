@@ -59,36 +59,34 @@ const userSchema = mongoose.Schema(
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
     tokens: { type: Number, default: 0 },
-    
+
     // Referral system fields
-    referralCode: { 
-      type: String, 
-      unique: true,
-      sparse: true,  // Allows null values to not trigger uniqueness constraint
-      index: true    // Index for faster lookups
+    referralCode: {
+      type: String,
+      // Removed unique and sparse options as they'll be defined in the schema.index()
     },
-    referredBy: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: "User" 
+    referredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
-    referralCount: { 
-      type: Number, 
-      default: 0 
+    referralCount: {
+      type: Number,
+      default: 0,
     },
-    earnings: { 
-      type: Number, 
-      default: 0 
+    earnings: {
+      type: Number,
+      default: 0,
     },
-    mlmTier: { 
-      type: Number, 
-      default: 0 
+    mlmTier: {
+      type: Number,
+      default: 0,
     },
-    
+
     // Tracking fields
     lastLogin: { type: Date },
     loginHistory: [{ type: Date }],
     purchaseHistory: [{ type: mongoose.Schema.Types.ObjectId, ref: "Order" }],
-    
+
     // Notification fields
     fcmTokens: [
       {
@@ -112,7 +110,11 @@ userSchema.pre("save", async function (next) {
   if (!this.referralCode) {
     // Use email and timestamp for uniqueness
     const seed = this.email + Date.now();
-    this.referralCode = crypto.createHash('md5').update(seed).digest('hex').substring(0, 8);
+    this.referralCode = crypto
+      .createHash("md5")
+      .update(seed)
+      .digest("hex")
+      .substring(0, 8);
   }
   next();
 });
@@ -135,11 +137,14 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 
 // Add indexes for frequently queried fields
 userSchema.index({ name: 1 });
-userSchema.index({ referralCode: 1 });
+userSchema.index({ referralCode: 1 }, { unique: true, sparse: true }); // Define uniqueness and sparseness here
 userSchema.index({ referredBy: 1 });
 
 // Method to add/update FCM token
-userSchema.methods.addFcmToken = async function (token, deviceInfo = "unknown") {
+userSchema.methods.addFcmToken = async function (
+  token,
+  deviceInfo = "unknown"
+) {
   // Check if token already exists
   const existingTokenIndex = this.fcmTokens.findIndex((t) => t.token === token);
   if (existingTokenIndex !== -1) {
@@ -175,13 +180,18 @@ userSchema.methods.updateMLMTier = async function (tier) {
 };
 
 // Add a method to increase earnings
-userSchema.methods.addEarnings = async function (amount, transactionType = "other", description = "", relatedUser = null) {
+userSchema.methods.addEarnings = async function (
+  amount,
+  transactionType = "other",
+  description = "",
+  relatedUser = null
+) {
   if (!amount || amount <= 0) return false;
-  
+
   // Update earnings
   this.earnings += amount;
   await this.save();
-  
+
   // Create transaction record if model is available
   try {
     const Transaction = mongoose.model("Transaction");
@@ -190,7 +200,7 @@ userSchema.methods.addEarnings = async function (amount, transactionType = "othe
       amount,
       type: transactionType,
       description,
-      relatedUser
+      relatedUser,
     });
     return true;
   } catch (error) {
@@ -201,8 +211,10 @@ userSchema.methods.addEarnings = async function (amount, transactionType = "othe
 
 // Get user's referrals
 userSchema.methods.getReferrals = async function (limit = 10, skip = 0) {
-  return mongoose.model("User").find({ referredBy: this._id })
-    .select('name email profilePicture referralCount earnings createdAt')
+  return mongoose
+    .model("User")
+    .find({ referredBy: this._id })
+    .select("name email profilePicture referralCount earnings createdAt")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
