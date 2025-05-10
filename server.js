@@ -5,6 +5,9 @@ const dotenv = require("dotenv");
 const connectDB = require("./config/db");
 const { protect, admin } = require("./middleware/authMiddleware");
 const cors = require("cors");
+const passport = require("passport");
+const session = require("express-session");
+const cookieParser = require("cookie-parser");
 
 // Load environment variables
 dotenv.config();
@@ -18,17 +21,51 @@ const app = express();
 const server = http.createServer(app);
 
 // Enable CORS for all origins for your Express API (update in production as needed)
-app.use(cors());
+app.use(
+  cors({
+    origin:
+      process.env.NODE_ENV === "production"
+        ? process.env.CLIENT_URL || "https://yourdomain.com"
+        : "http://localhost:3000",
+    credentials: true,
+  })
+);
 
 // Initialize Socket.IO
 const io = new Server(server, {
   cors: {
-    origin: "*", // Allow all origins (update in production)
+    origin:
+      process.env.NODE_ENV === "production"
+        ? process.env.CLIENT_URL || "https://yourdomain.com"
+        : "http://localhost:3000",
+    credentials: true,
   },
 });
 
 // Middleware to parse JSON
 app.use(express.json());
+app.use(cookieParser());
+
+// Session middleware (required for Passport)
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your-secret-key-here",
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
+      maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    },
+  })
+);
+
+// Initialize Passport and restore authentication state from session
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Import Passport configuration
+require("./config/passport");
 
 // Routes
 const authRoutes = require("./routes/authRoutes");
