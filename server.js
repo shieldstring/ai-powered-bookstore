@@ -21,15 +21,8 @@ const app = express();
 const server = http.createServer(app);
 
 // Enable CORS for all origins for your Express API (update in production as needed)
-app.use(
-  cors({
-    origin:
-      process.env.NODE_ENV === "production"
-        ? process.env.CLIENT_URL || "https://yourdomain.com"
-        : "http://localhost:3000",
-    credentials: true,
-  })
-);
+app.use(cors());
+
 
 // Initialize Socket.IO
 const io = new Server(server, {
