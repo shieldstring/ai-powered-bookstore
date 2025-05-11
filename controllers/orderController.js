@@ -7,46 +7,44 @@ const Transaction = require("../models/Transaction");
 // Create a new order
 const createOrder = async (req, res) => {
   const { orderItems, paymentResult } = req.body;
-
+  
   // Validate required fields
   if (!orderItems || orderItems.length === 0) {
     return res.status(400).json({ message: "No order items" });
   }
-
+  
   try {
     // Check stock availability
     for (const item of orderItems) {
       const bookId = item.book;
-
       if (!bookId) {
         return res
           .status(400)
           .json({ message: "Missing book ID in order items" });
       }
-
+      
       const book = await Book.findById(bookId);
-
       if (!book) {
         return res.status(404).json({ message: `Book ${bookId} not found` });
       }
-
+      
       if (book.countInStock < item.quantity) {
         return res.status(400).json({
           message: `Not enough stock for ${book.name}`,
         });
       }
     }
-
+    
     const session = await mongoose.startSession();
     session.startTransaction();
-
+    
     try {
       // Fetch book details for each order item to include in order
       const enhancedOrderItems = await Promise.all(
         orderItems.map(async (item) => {
           const book = await Book.findById(item.book).lean();
           if (!book) throw new Error(`Book ${item.book} not found`);
-
+          
           return {
             book: item.book,
             name: item.name || book.name, // Use frontend name first
@@ -56,52 +54,56 @@ const createOrder = async (req, res) => {
           };
         })
       );
-
+      
       if (!req.user?._id) {
         return res.status(401).json({ message: "Not authenticated" });
       }
-
+      
       const order = new Order({
         ...req.body,
         orderItems: enhancedOrderItems, // Uses merged data
         user: req.user._id,
       });
-
+      
+      // Save the order
+      const savedOrder = await order.save({ session });
+      
       // Update book quantities
       for (const item of orderItems) {
         const bookId = item.book;
-
         await Book.findByIdAndUpdate(
           bookId,
           { $inc: { countInStock: -item.quantity } },
           { session }
         );
       }
-
+      
       // Handle payment transaction if exists
       if (paymentResult?.id && paymentResult.id !== "simulated_payment_id") {
         await Transaction.findOneAndUpdate(
           { paymentIntentId: paymentResult.id },
-          { orderId: order[0]._id },
+          { orderId: savedOrder._id },
           { session }
         );
       }
-
+      
       // Clear cart
       await Cart.findOneAndUpdate(
         { user: req.user._id },
         { $set: { items: [] } },
         { session }
       );
-
+      
       await session.commitTransaction();
-      res.status(201).json(order[0]);
+      res.status(201).json(savedOrder);
+      
     } catch (error) {
       await session.abortTransaction();
       throw error;
     } finally {
       session.endSession();
     }
+    
   } catch (error) {
     console.error("Order creation error:", error);
     res.status(500).json({
