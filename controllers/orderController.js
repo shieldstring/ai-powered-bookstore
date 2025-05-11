@@ -14,54 +14,92 @@ const createOrder = async (req, res) => {
     paymentResult,
   } = req.body;
 
-  try {
-    // Create the order
-    const order = await Order.create({
-      user: req.user._id,
-      orderItems: orderItems.map((item) => ({
-        book: item._id,
-        name: item.name,
-        quantity: item.quantity,
-        image: item.image,
-        price: item.price,
-      })),
-      shippingAddress,
-      paymentMethod,
-      itemsPrice,
-      taxPrice: req.body.taxPrice || 0,
-      shippingPrice: req.body.shippingPrice || 0,
-      totalPrice,
-      isPaid: false,
-      status: "pending",
-    });
+  // Validate required fields
+  if (!orderItems || orderItems.length === 0) {
+    return res.status(400).json({ message: "No order items" });
+  }
 
-    // If there's a payment result with an ID (from Stripe), update the transaction
-    if (
-      paymentResult &&
-      paymentResult.id &&
-      paymentResult.id !== "simulated_payment_id"
-    ) {
-      const transaction = await Transaction.findOne({
-        paymentIntentId: paymentResult.id,
-      });
-      if (transaction) {
-        transaction.orderId = order._id;
-        await transaction.save();
+  try {
+    // Check stock availability
+    for (const item of orderItems) {
+      const book = await Book.findById(item._id);
+      if (!book) {
+        return res.status(404).json({ message: `Book ${item._id} not found` });
+      }
+      if (book.countInStock < item.quantity) {
+        return res.status(400).json({
+          message: `Not enough stock for ${item.name}`,
+        });
       }
     }
 
-    // Clear the user's cart in the database if they have one
-    await Cart.findOneAndUpdate(
-      { user: req.user._id },
-      { $set: { items: [] } }
-    );
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    res.status(201).json(order);
+    try {
+      // Create the order
+      const order = await Order.create(
+        [
+          {
+            user: req.user._id,
+            orderItems: orderItems.map((item) => ({
+              book: item._id,
+              name: item.name,
+              quantity: item.quantity,
+              image: item.image,
+              price: item.price,
+            })),
+            shippingAddress,
+            paymentMethod,
+            itemsPrice,
+            taxPrice: req.body.taxPrice || 0,
+            shippingPrice: req.body.shippingPrice || 0,
+            totalPrice,
+            isPaid: false,
+            status: "pending",
+          },
+        ],
+        { session }
+      );
+
+      // Update book quantities
+      for (const item of orderItems) {
+        await Book.findByIdAndUpdate(
+          item._id,
+          { $inc: { countInStock: -item.quantity } },
+          { session }
+        );
+      }
+
+      // Handle payment transaction if exists
+      if (paymentResult?.id && paymentResult.id !== "simulated_payment_id") {
+        await Transaction.findOneAndUpdate(
+          { paymentIntentId: paymentResult.id },
+          { orderId: order[0]._id },
+          { session }
+        );
+      }
+
+      // Clear cart
+      await Cart.findOneAndUpdate(
+        { user: req.user._id },
+        { $set: { items: [] } },
+        { session }
+      );
+
+      await session.commitTransaction();
+      res.status(201).json(order[0]);
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   } catch (error) {
     console.error("Order creation error:", error);
-    res
-      .status(500)
-      .json({ message: error.message || "Server error creating order" });
+    res.status(500).json({
+      message: error.message || "Server error creating order",
+    });
   }
 };
 
@@ -70,14 +108,17 @@ const updateOrderPaymentStatus = async (req, res) => {
   const { orderId } = req.params;
   const { paymentData } = req.body;
 
+  if (!paymentData?.id || !paymentData?.status) {
+    return res.status(400).json({ message: "Invalid payment data" });
+  }
+
   try {
     const order = await Order.findById(orderId);
-
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // Only the order owner or admin can update
+    // Authorization check
     if (
       order.user.toString() !== req.user._id.toString() &&
       req.user.role !== "admin"
@@ -85,33 +126,60 @@ const updateOrderPaymentStatus = async (req, res) => {
       return res.status(403).json({ message: "Not authorized" });
     }
 
-    order.isPaid = true;
-    order.paidAt = Date.now();
-    order.paymentResult = {
-      id: paymentData.id,
-      status: paymentData.status,
-      update_time: new Date().toISOString(),
-      email_address: paymentData.email_address || req.user.email,
+    // Prevent duplicate payment updates
+    if (order.isPaid) {
+      return res.status(400).json({ message: "Order is already paid" });
+    }
+
+    const update = {
+      isPaid: true,
+      paidAt: Date.now(),
+      paymentResult: {
+        id: paymentData.id,
+        status: paymentData.status,
+        update_time: new Date().toISOString(),
+        email_address: paymentData.email_address || req.user.email,
+      },
+      status: "processing", // Move to next status after payment
     };
 
-    const updatedOrder = await order.save();
+    const updatedOrder = await Order.findByIdAndUpdate(orderId, update, {
+      new: true,
+      runValidators: true,
+    }).populate("orderItems.book");
 
     res.json(updatedOrder);
   } catch (error) {
     console.error("Payment status update error:", error);
-    res.status(500).json({ message: "Server error updating payment status" });
+    res.status(500).json({
+      message: error.message || "Server error updating payment status",
+    });
   }
 };
 
 // Get all orders for the user
 const getOrders = async (req, res) => {
+  const { page = 1, limit = 10 } = req.query;
+
   try {
-    const orders = await Order.find({ user: req.user._id }).populate(
-      "items.book"
-    );
-    res.json(orders);
+    const orders = await Order.find({ user: req.user._id })
+      .populate("orderItems.book")
+      .sort({ createdAt: -1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await Order.countDocuments({ user: req.user._id });
+
+    res.json({
+      orders,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Get orders error:", error);
+    res.status(500).json({
+      message: error.message || "Server error fetching orders",
+    });
   }
 };
 
@@ -119,32 +187,73 @@ const getOrders = async (req, res) => {
 const getOrderById = async (req, res) => {
   const { id } = req.params;
 
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid order ID" });
+  }
+
   try {
-    const order = await Order.findById(id).populate("items.book");
+    const order = await Order.findById(id)
+      .populate("orderItems.book")
+      .populate("user", "name email");
+
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // Ensure the user can only access their own orders
-    if (order.user.toString() !== req.user._id.toString()) {
+    // Authorization check
+    if (
+      order.user._id.toString() !== req.user._id.toString() &&
+      req.user.role !== "admin"
+    ) {
       return res.status(403).json({ message: "Not authorized" });
     }
 
     res.json(order);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Get order by ID error:", error);
+    res.status(500).json({
+      message: error.message || "Server error fetching order",
+    });
   }
 };
 
 // Get all orders (admin only)
 const getAllOrders = async (req, res) => {
+  const {
+    page = 1,
+    limit = 10,
+    status,
+    sortField = "createdAt",
+    sortOrder = "desc",
+  } = req.query;
+
   try {
-    const orders = await Order.find()
-      .populate("items.book")
-      .populate("user", "name email");
-    res.json(orders);
+    const filter = {};
+    if (status) filter.status = status;
+
+    const sort = {};
+    sort[sortField] = sortOrder === "desc" ? -1 : 1;
+
+    const orders = await Order.find(filter)
+      .populate("orderItems.book")
+      .populate("user", "name email")
+      .sort(sort)
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const count = await Order.countDocuments(filter);
+
+    res.json({
+      orders,
+      totalPages: Math.ceil(count / limit),
+      currentPage: page,
+      totalOrders: count,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Get all orders error:", error);
+    res.status(500).json({
+      message: error.message || "Server error fetching orders",
+    });
   }
 };
 
@@ -153,18 +262,50 @@ const updateOrderStatus = async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
+  const validStatuses = [
+    "pending",
+    "processing",
+    "shipped",
+    "delivered",
+    "canceled",
+  ];
+  if (!validStatuses.includes(status)) {
+    return res.status(400).json({ message: "Invalid status" });
+  }
+
   try {
     const order = await Order.findById(id);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    order.status = status;
-    await order.save();
+    // Validate status transition
+    if (order.status === "canceled" && status !== "canceled") {
+      return res
+        .status(400)
+        .json({ message: "Canceled orders cannot be updated" });
+    }
 
-    res.json(order);
+    if (order.status === "delivered" && status !== "delivered") {
+      return res
+        .status(400)
+        .json({ message: "Delivered orders cannot be updated" });
+    }
+
+    order.status = status;
+
+    // Update deliveredAt if status is delivered
+    if (status === "delivered") {
+      order.deliveredAt = Date.now();
+    }
+
+    const updatedOrder = await order.save();
+    res.json(updatedOrder);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Update order status error:", error);
+    res.status(500).json({
+      message: error.message || "Server error updating order status",
+    });
   }
 };
 
@@ -178,17 +319,45 @@ const cancelOrder = async (req, res) => {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    // Only allow canceling orders that are not already completed or canceled
-    if (order.status === "delivered" || order.status === "canceled") {
-      return res.status(400).json({ message: "Order cannot be canceled" });
+    if (order.status === "delivered") {
+      return res
+        .status(400)
+        .json({ message: "Delivered orders cannot be canceled" });
     }
 
-    order.status = "canceled";
-    await order.save();
+    if (order.status === "canceled") {
+      return res.status(400).json({ message: "Order is already canceled" });
+    }
 
-    res.json(order);
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+      // Restore inventory
+      for (const item of order.orderItems) {
+        await Book.findByIdAndUpdate(
+          item.book,
+          { $inc: { countInStock: item.quantity } },
+          { session }
+        );
+      }
+
+      order.status = "canceled";
+      const updatedOrder = await order.save({ session });
+
+      await session.commitTransaction();
+      res.json(updatedOrder);
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Cancel order error:", error);
+    res.status(500).json({
+      message: error.message || "Server error canceling order",
+    });
   }
 };
 
@@ -196,16 +365,30 @@ const cancelOrder = async (req, res) => {
 const deleteOrder = async (req, res) => {
   const { id } = req.params;
 
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid order ID" });
+  }
+
   try {
     const order = await Order.findById(id);
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
+    // Prevent deletion of orders that are processing or shipped
+    if (["processing", "shipped"].includes(order.status)) {
+      return res.status(400).json({
+        message: "Cannot delete order with current status",
+      });
+    }
+
     await Order.findByIdAndDelete(id);
     res.json({ message: "Order deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Delete order error:", error);
+    res.status(500).json({
+      message: error.message || "Server error deleting order",
+    });
   }
 };
 
