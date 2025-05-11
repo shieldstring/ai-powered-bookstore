@@ -1,343 +1,497 @@
 const Book = require("../models/Book");
+const mongoose = require("mongoose");
 
-// Get all books with limited details (including rating and reviewCount)
+// Helper function for pagination
+const getPaginationOptions = (query) => ({
+  page: parseInt(query.page) || 1,
+  limit: parseInt(query.limit) || 10,
+  sort: query.sort || '-createdAt'
+});
+
+// Get all books with filtering, sorting, and pagination
 const getBooks = async (req, res) => {
   try {
-    // Extract query parameters
-    const pageSize = Number(req.query.limit) || 10;
-    const page = Number(req.query.page) || 1;
-    const keyword = req.query.keyword
-      ? {
-          title: {
-            $regex: req.query.keyword,
-            $options: "i",
-          },
-        }
-      : {};
+    const { page, limit, sort } = getPaginationOptions(req.query);
+    const skip = (page - 1) * limit;
 
-    // Category filter
-    const category = req.query.category ? { category: req.query.category } : {};
+    // Build the query filters
+    const filters = {
+      isActive: true,
+      ...(req.query.keyword && { 
+        $text: { $search: req.query.keyword } 
+      }),
+      ...(req.query.category && { category: req.query.category }),
+      ...(req.query.author && { author: req.query.author }),
+      ...(req.query.minPrice && { price: { $gte: parseFloat(req.query.minPrice) } }),
+      ...(req.query.maxPrice && { price: { ...(req.query.minPrice ? filters.price : {}), $lte: parseFloat(req.query.maxPrice) } }),
+      ...(req.query.format && { format: req.query.format }),
+      ...(req.query.language && { language: req.query.language }),
+      ...(req.query.tag && { tags: req.query.tag })
+    };
 
-    // Author filter
-    const author = req.query.author ? { author: req.query.author } : {};
-
-    // Price range filter
-    const priceFilter = {};
-    if (req.query.minPrice) {
-      priceFilter.price = {
-        ...priceFilter.price,
-        $gte: Number(req.query.minPrice),
-      };
-    }
-    if (req.query.maxPrice) {
-      priceFilter.price = {
-        ...priceFilter.price,
-        $lte: Number(req.query.maxPrice),
-      };
-    }
-
-    // Sort options
+    // Determine sort option
     let sortOption = {};
-    if (req.query.sort) {
-      switch (req.query.sort) {
-        case "price-asc":
-          sortOption = { price: 1 };
-          break;
-        case "price-desc":
-          sortOption = { price: -1 };
-          break;
-        case "newest":
-          sortOption = { createdAt: -1 };
-          break;
-        case "rating":
-          // For rating sort, we'll handle it after fetching the books
-          sortOption = { createdAt: -1 };
-          break;
-        case "bestseller":
-          sortOption = { purchaseCount: -1 };
-          break;
-        default:
-          sortOption = { createdAt: -1 };
-      }
-    } else {
-      sortOption = { createdAt: -1 }; // Default sorting
+    switch (sort) {
+      case 'price-asc': sortOption = { price: 1 }; break;
+      case 'price-desc': sortOption = { price: -1 }; break;
+      case 'newest': sortOption = { createdAt: -1 }; break;
+      case 'oldest': sortOption = { createdAt: 1 }; break;
+      case 'rating': sortOption = { averageRating: -1 }; break;
+      case 'bestseller': sortOption = { purchaseCount: -1 }; break;
+      case 'title-asc': sortOption = { title: 1 }; break;
+      case 'title-desc': sortOption = { title: -1 }; break;
+      default: sortOption = { createdAt: -1 };
     }
 
-    // Count total books that match the query
-    const count = await Book.countDocuments({
-      ...keyword,
-      ...category,
-      ...author,
-      ...priceFilter,
-    });
+    // Get total count and books
+    const [total, books] = await Promise.all([
+      Book.countDocuments(filters),
+      Book.find(filters)
+        .sort(sortOption)
+        .skip(skip)
+        .limit(limit)
+        .select('-reviews -salesHistory -__v')
+        .lean()
+    ]);
 
-    // Get books with pagination
-    let books = await Book.find({
-      ...keyword,
-      ...category,
-      ...author,
-      ...priceFilter,
-    })
-      .sort(sortOption)
-      .limit(pageSize)
-      .skip(pageSize * (page - 1));
-
-    // Map books to include only the fields we want
-    const formattedBooks = books.map((book) => {
-      // Calculate rating manually from reviews
-      let rating = 0;
-      if (book.reviews && book.reviews.length > 0) {
-        const totalRating = book.reviews.reduce(
-          (sum, review) => sum + review.rating,
-          0
-        );
-        rating = parseFloat((totalRating / book.reviews.length).toFixed(1));
-      }
-
-      // Get review count
-      const reviewCount = book.reviews ? book.reviews.length : 0;
-
-      // Return simplified book object
-      return {
-        _id: book._id,
-        title: book.title,
-        author: book.author,
-        price: book.price,
-        originalPrice: book.originalPrice,
-        image: book.image,
-        tag: book.tag,
-        category: book.category,
-        description: book.description,
-        rating,
-        reviewCount,
-      };
-    });
-
-    // Handle special case for rating sort
-    if (req.query.sort === "rating") {
-      formattedBooks.sort((a, b) => b.rating - a.rating);
-    }
-
-    // Return response with pagination info
     res.json({
-      books: formattedBooks,
+      success: true,
+      count: books.length,
+      total,
       page,
-      pages: Math.ceil(count / pageSize),
-      totalBooks: count,
+      pages: Math.ceil(total / limit),
+      data: books
     });
   } catch (error) {
     console.error("Error fetching books:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ 
+      success: false,
+      message: "Server error while fetching books",
+      error: error.message 
+    });
+  }
+};
+
+// Get a single book by ID with full details
+const getBookById = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid book ID format" 
+      });
+    }
+
+    const book = await Book.findById(req.params.id)
+      .populate('reviews.user', 'name avatar')
+      .populate('salesHistory.orderId', 'status totalPrice');
+
+    if (!book) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Book not found" 
+      });
+    }
+
+    // Increment view count
+    await book.incrementViews();
+
+    res.json({ 
+      success: true,
+      data: book 
+    });
+  } catch (error) {
+    console.error("Error fetching book:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error while fetching book",
+      error: error.message 
+    });
   }
 };
 
 // Add a new book
 const addBook = async (req, res) => {
-  const { title, author, description, price, image, category } = req.body;
-
   try {
-    const book = await Book.create({
-      title,
-      author,
-      description,
-      price,
-      image,
-      category,
+    const bookData = {
+      ...req.body,
+      // Ensure required fields
+      title: req.body.title.trim(),
+      author: req.body.author.trim(),
+      price: parseFloat(req.body.price),
+      inventory: parseInt(req.body.inventory) || 0,
+      isActive: req.body.inventory > 0
+    };
+
+    const book = await Book.create(bookData);
+    
+    res.status(201).json({ 
+      success: true,
+      data: book 
     });
-    res.status(201).json(book);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Error adding book:", error);
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({ 
+        success: false,
+        message: "Validation error",
+        errors: messages 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false,
+      message: "Server error while adding book",
+      error: error.message 
+    });
   }
 };
 
-// Edit a book
-const editBook = async (req, res) => {
-  const { id } = req.params;
-  const { title, author, description, price, image, genre } = req.body;
-
+// Update a book
+/**
+ * @desc    Update a book (handles both PUT and PATCH)
+ * @route   PUT /api/books/:id (full update)
+ * @route   PATCH /api/books/:id (partial update)
+ * @access  Private/Admin
+ */
+const updateBook = async (req, res) => {
   try {
-    const book = await Book.findByIdAndUpdate(
+    const { id } = req.params;
+
+    // Validate book ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid book ID format"
+      });
+    }
+
+    // Find existing book
+    const existingBook = await Book.findById(id);
+    if (!existingBook) {
+      return res.status(404).json({
+        success: false,
+        message: "Book not found"
+      });
+    }
+
+    // Prepare update data
+    const updateData = {
+      ...(req.method === 'PUT' ? { 
+        // For PUT (full update), include all required fields with defaults
+        title: req.body.title || existingBook.title,
+        author: req.body.author || existingBook.author,
+        price: req.body.price !== undefined ? parseFloat(req.body.price) : existingBook.price,
+        // ... other required fields
+      } : { 
+        // For PATCH (partial update), only include provided fields
+        ...req.body 
+      }),
+      
+      // Common processing for both methods
+      ...(req.body.price !== undefined && { price: parseFloat(req.body.price) }),
+      ...(req.body.inventory !== undefined && { 
+        inventory: parseInt(req.body.inventory),
+        isActive: parseInt(req.body.inventory) > 0
+      })
+    };
+
+    // Validate price relationship
+    if (updateData.price && updateData.originalPrice) {
+      if (updateData.originalPrice < updateData.price) {
+        return res.status(400).json({
+          success: false,
+          message: "Original price must be greater than current price"
+        });
+      }
+    }
+
+    // Execute update
+    const updatedBook = await Book.findByIdAndUpdate(
       id,
-      { title, author, description, price, image, genre },
-      { new: true } // Return the updated book
+      updateData,
+      { 
+        new: true,
+        runValidators: true,
+        context: 'query',
+        overwrite: req.method === 'PUT' // Only for full updates
+      }
+    ).populate('reviews.user', 'name avatar');
+
+    // Handle inventory changes
+    if (req.body.inventory !== undefined && 
+        req.body.inventory !== existingBook.inventory) {
+      const adjustment = parseInt(req.body.inventory) - existingBook.inventory;
+      
+      await Book.findByIdAndUpdate(id, {
+        $push: {
+          inventoryHistory: {
+            date: new Date(),
+            adjustment,
+            newValue: parseInt(req.body.inventory),
+            reason: req.method === 'PUT' ? 'Full update' : 'Partial update',
+            admin: req.user._id
+          }
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Book ${req.method === 'PUT' ? 'replaced' : 'updated'} successfully`,
+      data: updatedBook
+    });
+
+  } catch (error) {
+    console.error(`Error ${req.method === 'PUT' ? 'replacing' : 'updating'} book:`, error);
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: messages
+      });
+    }
+    
+    if (error.code === 11000 && error.keyPattern?.isbn) {
+      return res.status(400).json({
+        success: false,
+        message: "ISBN already exists"
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: `Server error while ${req.method === 'PUT' ? 'replacing' : 'updating'} book`
+    });
+  }
+};
+
+// Delete a book (soft delete)
+const deleteBook = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid book ID format" 
+      });
+    }
+
+    const book = await Book.findByIdAndUpdate(
+      req.params.id,
+      { isActive: false },
+      { new: true }
     );
 
     if (!book) {
-      return res.status(404).json({ message: "Book not found" });
+      return res.status(404).json({ 
+        success: false,
+        message: "Book not found" 
+      });
     }
 
-    res.json(book);
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Delete a book
-const deleteBook = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const book = await Book.findByIdAndDelete(id);
-
-    if (!book) {
-      return res.status(404).json({ message: "Book not found" });
-    }
-
-    res.json({ message: "Book deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Track a book purchase
-const trackPurchase = async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const book = await Book.findById(id);
-    if (!book) {
-      return res.status(404).json({ message: "Book not found" });
-    }
-
-    // Increment purchase count
-    book.purchaseCount += 1;
-    await book.save();
-
-    res.json({
-      message: "Purchase tracked",
-      purchaseCount: book.purchaseCount,
+    res.json({ 
+      success: true,
+      message: "Book deactivated successfully",
+      data: book 
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Error deleting book:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error while deleting book",
+      error: error.message 
+    });
   }
 };
 
 // Add a review to a book
 const addReview = async (req, res) => {
-  const { id } = req.params;
-  const { rating, comment } = req.body;
-
   try {
-    const book = await Book.findById(id);
-    if (!book) {
-      return res.status(404).json({ message: "Book not found" });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid book ID format" 
+      });
     }
 
-    const review = {
-      user: req.user._id,
-      rating,
-      comment,
-    };
+    const { rating, comment } = req.body;
+    
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Rating must be between 1 and 5" 
+      });
+    }
 
-    book.reviews.push(review);
+    const book = await Book.findById(req.params.id);
+    if (!book) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Book not found" 
+      });
+    }
+
+    // Check if user already reviewed this book
+    const existingReviewIndex = book.reviews.findIndex(
+      review => review.user.toString() === req.user._id.toString()
+    );
+
+    if (existingReviewIndex >= 0) {
+      // Update existing review
+      book.reviews[existingReviewIndex].rating = rating;
+      book.reviews[existingReviewIndex].comment = comment || '';
+    } else {
+      // Add new review
+      book.reviews.push({
+        user: req.user._id,
+        rating,
+        comment: comment || ''
+      });
+    }
+
     await book.save();
 
-    res.status(201).json(book);
+    res.status(201).json({ 
+      success: true,
+      message: "Review submitted successfully",
+      data: book 
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Error adding review:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error while adding review",
+      error: error.message 
+    });
   }
 };
 
-// Get a single book by ID
-const getBookById = async (req, res) => {
-  const { id } = req.params;
-
+// Update inventory for multiple books (bulk operation)
+const bulkUpdateInventory = async (req, res) => {
   try {
-    const book = await Book.findById(id).populate("reviews.user", "name");
-    if (!book) {
-      return res.status(404).json({ message: "Book not found" });
+    const { updates } = req.body;
+    
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid updates array" 
+      });
     }
 
-    res.json(book);
+    const bulkOps = updates.map(update => ({
+      updateOne: {
+        filter: { _id: update.bookId },
+        update: { 
+          $set: { 
+            inventory: update.quantity,
+            isActive: update.quantity > 0
+          } 
+        }
+      }
+    }));
+
+    const result = await Book.bulkWrite(bulkOps);
+
+    res.json({ 
+      success: true,
+      message: "Inventory updated successfully",
+      data: result 
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Error updating inventory:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error while updating inventory",
+      error: error.message 
+    });
   }
 };
 
-// Get AI-curated book recommendations
+// Get book recommendations
 const getRecommendations = async (req, res) => {
   try {
-    // Example: Recommend books based on user's reading history (to be replaced with AI logic)
-    const recommendedBooks = await Book.find().limit(10); // Replace with AI logic
-    res.json(recommendedBooks);
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
+    // Basic recommendation logic - can be enhanced with ML
+    const recommendations = await Book.aggregate([
+      { $match: { isActive: true } },
+      { $sample: { size: 10 } }, // Random sample
+      { $sort: { averageRating: -1, purchaseCount: -1 } },
+      { $limit: 6 },
+      { $project: { 
+        title: 1,
+        author: 1,
+        price: 1,
+        originalPrice: 1,
+        image: 1,
+        averageRating: 1,
+        reviewCount: 1,
+        discountPercentage: 1
+      }}
+    ]);
 
-// Search books manually
-const searchBooks = async (req, res) => {
-  const { query } = req.query;
-
-  try {
-    const books = await Book.find({
-      $or: [
-        { title: { $regex: query, $options: "i" } },
-        { author: { $regex: query, $options: "i" } },
-        { genre: { $regex: query, $options: "i" } },
-      ],
+    res.json({ 
+      success: true,
+      count: recommendations.length,
+      data: recommendations 
     });
-
-    res.json(books);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Error getting recommendations:", error);
+    res.status(500).json({ 
+      success: false,
+      message: "Server error while getting recommendations",
+      error: error.message 
+    });
   }
 };
 
-// Update book inventory
-const updateInventory = async (req, res) => {
-  const { id } = req.params;
-  const { inventory } = req.body;
-
+// Track a book purchase (used by order system)
+const trackPurchase = async (req, res) => {
   try {
-    const book = await Book.findById(id);
-    if (!book) {
-      return res.status(404).json({ message: "Book not found" });
+    const { bookId, quantity, orderId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(bookId)) {
+      return res.status(400).json({ 
+        success: false,
+        message: "Invalid book ID format" 
+      });
     }
 
-    book.inventory = inventory;
-    await book.save();
+    const book = await Book.findById(bookId);
+    if (!book) {
+      return res.status(404).json({ 
+        success: false,
+        message: "Book not found" 
+      });
+    }
 
-    res.json(book);
+    await book.updateInventory(-quantity, orderId);
+
+    res.json({ 
+      success: true,
+      message: "Purchase tracked successfully",
+      data: book 
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Error tracking purchase:", error);
+    res.status(500).json({ 
+      success: false,
+      message: error.message || "Server error while tracking purchase",
+      error: error.message 
+    });
   }
 };
 
-// Bulk delete books
-const bulkDeleteBooks = async (req, res) => {
-  const { bookIds } = req.body;
-
-  try {
-    await Book.deleteMany({ _id: { $in: bookIds } });
-    res.json({ message: "Books deleted successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
-
-// Bulk update inventory
-const bulkUpdateInventory = async (req, res) => {
-  const { bookIds, inventory } = req.body;
-
-  try {
-    await Book.updateMany({ _id: { $in: bookIds } }, { $set: { inventory } });
-    res.json({ message: "Inventory updated successfully" });
-  } catch (error) {
-    res.status(500).json({ message: "Server error" });
-  }
-};
 module.exports = {
   getBooks,
-  addBook,
-  editBook,
-  deleteBook,
-  trackPurchase,
-  addReview,
   getBookById,
-  getRecommendations,
-  searchBooks,
-  updateInventory,
-  bulkDeleteBooks,
+  addBook,
+  updateBook,
+  deleteBook,
+  addReview,
   bulkUpdateInventory,
+  getRecommendations,
+  trackPurchase
 };
