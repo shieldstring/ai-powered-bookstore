@@ -1,400 +1,164 @@
 // Sample data for MongoDB Book collection with embedded reviews
 // Note: MongoDB will automatically generate _id fields for the main documents and subdocuments
 const mongoose = require("mongoose");
+
 const bookSampleData = [
   {
     title: "The Midnight Library",
     author: "Matt Haig",
-    description:
-      "Between life and death there is a library, and within that library, the shelves go on forever. Every book provides a chance to try another life you could have lived.",
+    description: "Between life and death there is a library, and within that library, the shelves go on forever. Every book provides a chance to try another life you could have lived.",
     price: 24.99,
     originalPrice: 29.99,
     isbn: "9780525559474",
     language: "English",
-    format: "Hardcover, 304 pages",
+    format: "Hardcover",
     publishDate: new Date("2020-09-29"),
     publisher: "Viking",
-    image:
-      "https://img1.od-cdn.com/ImageType-100/0293-1/%7BEB3594ED-AC51-4EF3-B21A-F8E7C4B77E8A%7DImg100.jpg",
-    tag: "BEST SELLER",
+    image: "https://images.example.com/midnight-library.jpg",
     category: "Fiction",
+    tags: ["bestseller", "contemporary"],
     affiliateLink: "https://bookstore.com/midnight-library",
     inventory: 45,
     purchaseCount: 1289,
+    isActive: true,
+    viewCount: 3421,
+    wishlistCount: 876,
+    edition: "First Edition",
+    pageCount: 304,
+    dimensions: {
+      height: 9.25,
+      width: 6.25,
+      thickness: 1.1
+    },
+    weight: 1.2,
     reviews: [
       {
         user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c85"),
         rating: 5,
-        comment:
-          "Absolutely life-changing book. The concept really made me think about my choices.",
-        createdAt: new Date("2023-09-15T14:32:21.000Z"),
-        updatedAt: new Date("2023-09-15T14:32:21.000Z"),
-      },
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c86"),
-        rating: 4,
-        comment:
-          "Beautiful writing and thought-provoking premise. A bit predictable toward the end.",
-        createdAt: new Date("2023-10-02T08:14:53.000Z"),
-        updatedAt: new Date("2023-10-02T08:14:53.000Z"),
-      },
+        comment: "Absolutely life-changing book. The concept really made me think about my choices.",
+        helpfulVotes: 42,
+        createdAt: new Date("2023-09-15"),
+        updatedAt: new Date("2023-09-15")
+      }
     ],
-    createdAt: new Date("2023-08-01T10:23:54.000Z"),
-    updatedAt: new Date("2024-01-15T16:42:10.000Z"),
-  },
-  {
-    title: "Algorithms to Live By",
-    author: "Brian Christian & Tom Griffiths",
-    description:
-      "How computer algorithms can be applied to our everyday lives, helping to solve common decision-making problems.",
-    price: 19.99,
-    originalPrice: 25.99,
-    isbn: "9781627790369",
-    language: "English",
-    format: "Hardcover, 368 pages",
-    publishDate: new Date("2016-04-19"),
-    publisher: "Henry Holt and Co.",
-    image:
-      "https://sanfranciscobookreview.com/wp-content/uploads/2016/06/algorithms_to_live_by.jpg",
-    tag: "BEST SELLER",
-    category: "Non-fiction",
-    affiliateLink: "https://bookstore.com/algorithms-live-by",
-    inventory: 32,
-    purchaseCount: 785,
-    reviews: [
+    salesHistory: [
       {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c87"),
-        rating: 5,
-        comment:
-          "As a programmer, I found this incredibly insightful. Great applications of CS concepts.",
-        createdAt: new Date("2023-11-18T21:45:33.000Z"),
-        updatedAt: new Date("2023-11-18T21:45:33.000Z"),
-      },
+        date: new Date("2023-09-20"),
+        quantity: 5,
+        revenue: 124.95,
+        orderId: new mongoose.Types.ObjectId("60d21b4667d0d8992e611a01")
+      }
     ],
-    createdAt: new Date("2023-07-12T09:10:23.000Z"),
-    updatedAt: new Date("2024-02-03T11:24:15.000Z"),
+    createdAt: new Date("2023-08-01"),
+    updatedAt: new Date("2024-01-15")
   },
   {
     title: "Dune",
     author: "Frank Herbert",
-    description:
-      "Set on the desert planet Arrakis, Dune is the story of the boy Paul Atreides, heir to a noble family tasked with ruling an inhospitable world.",
+    description: "Set on the desert planet Arrakis, Dune is the story of the boy Paul Atreides, heir to a noble family tasked with ruling an inhospitable world.",
     price: 17.99,
     originalPrice: 21.99,
     isbn: "9780441172719",
     language: "English",
-    format: "Mass Market Paperback, 896 pages",
+    format: "Paperback",
     publishDate: new Date("1990-09-01"),
     publisher: "Ace Books",
-    image:
-      "https://i.pinimg.com/originals/1c/2d/4b/1c2d4b6633bc681f44a05095d8a6ddb0.jpg",
-    tag: "",
+    image: "https://images.example.com/dune.jpg",
     category: "Science Fiction",
+    tags: ["classic", "sci-fi"],
     affiliateLink: "https://bookstore.com/dune",
     inventory: 78,
     purchaseCount: 3421,
+    isActive: true,
+    viewCount: 8923,
+    wishlistCount: 1567,
+    edition: "Special Edition",
+    pageCount: 896,
+    dimensions: {
+      height: 8.0,
+      width: 5.25,
+      thickness: 1.5
+    },
+    weight: 1.1,
     reviews: [
       {
         user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c88"),
         rating: 5,
-        comment:
-          "A masterpiece of science fiction. The worldbuilding is unparalleled.",
-        createdAt: new Date("2023-08-29T15:12:44.000Z"),
-        updatedAt: new Date("2023-08-29T15:12:44.000Z"),
-      },
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c89"),
-        rating: 4,
-        comment:
-          "Complex but rewarding. Takes some time to get into but worth the effort.",
-        createdAt: new Date("2023-09-14T18:23:10.000Z"),
-        updatedAt: new Date("2023-09-14T18:23:10.000Z"),
-      },
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c8a"),
-        rating: 5,
-        comment: "The best sci-fi book ever written. Period.",
-        createdAt: new Date("2023-12-01T07:41:22.000Z"),
-        updatedAt: new Date("2023-12-01T07:41:22.000Z"),
-      },
+        comment: "A masterpiece of science fiction. The worldbuilding is unparalleled.",
+        helpfulVotes: 87,
+        createdAt: new Date("2023-08-29"),
+        updatedAt: new Date("2023-08-29")
+      }
     ],
-    createdAt: new Date("2023-06-15T14:23:11.000Z"),
-    updatedAt: new Date("2024-03-10T09:15:34.000Z"),
+    salesHistory: [
+      {
+        date: new Date("2023-09-01"),
+        quantity: 10,
+        revenue: 179.90,
+        orderId: new mongoose.Types.ObjectId("60d21b4667d0d8992e611a04")
+      }
+    ],
+    createdAt: new Date("2023-06-15"),
+    updatedAt: new Date("2024-03-10")
   },
   {
     title: "Atomic Habits",
     author: "James Clear",
-    description:
-      "An easy and proven way to build good habits and break bad ones.",
+    description: "An easy and proven way to build good habits and break bad ones.",
     price: 15.99,
     originalPrice: 19.99,
     isbn: "9780735211292",
     language: "English",
-    format: "Hardcover, 320 pages",
+    format: "Hardcover",
     publishDate: new Date("2018-10-16"),
     publisher: "Avery",
-    image:
-      "https://jamesclear.com/wp-content/uploads/2021/08/atomic-habits-dots-1.png",
-    tag: "BEST SELLER",
+    image: "https://images.example.com/atomic-habits.jpg",
     category: "Self-help",
+    tags: ["productivity", "psychology"],
     affiliateLink: "https://bookstore.com/atomic-habits",
     inventory: 120,
     purchaseCount: 5231,
+    isActive: true,
+    viewCount: 6543,
+    wishlistCount: 2345,
+    edition: "First Edition",
+    pageCount: 320,
+    dimensions: {
+      height: 9.0,
+      width: 6.0,
+      thickness: 1.0
+    },
+    weight: 1.0,
     reviews: [
       {
         user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c8b"),
         rating: 5,
-        comment:
-          "Changed how I approach behavior change. The 1% better concept is revolutionary.",
-        createdAt: new Date("2023-10-22T11:32:54.000Z"),
-        updatedAt: new Date("2023-10-22T11:32:54.000Z"),
-      },
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c8c"),
-        rating: 5,
-        comment:
-          "Practical advice that's actually implementable. Has genuinely improved my daily routines.",
-        createdAt: new Date("2023-11-30T16:45:12.000Z"),
-        updatedAt: new Date("2023-11-30T16:45:12.000Z"),
-      },
+        comment: "Changed how I approach behavior change. The 1% better concept is revolutionary.",
+        helpfulVotes: 156,
+        createdAt: new Date("2023-10-22"),
+        updatedAt: new Date("2023-10-22")
+      }
     ],
-    createdAt: new Date("2023-05-20T08:34:22.000Z"),
-    updatedAt: new Date("2024-02-28T13:51:09.000Z"),
-  },
-  {
-    title: "The Silent Patient",
-    author: "Alex Michaelides",
-    description:
-      "A psychological thriller about a woman's act of violence against her husband—and her refusal to speak about it afterward.",
-    price: 14.99,
-    originalPrice: 17.99,
-    isbn: "9781250301697",
-    language: "English",
-    format: "Hardcover, 336 pages",
-    publishDate: new Date("2019-02-05"),
-    publisher: "Celadon Books",
-    image: "https://m.media-amazon.com/images/I/91BbLCJOruL.jpg",
-    tag: "BEST SELLER",
-    category: "Thriller",
-    affiliateLink: "https://bookstore.com/silent-patient",
-    inventory: 23,
-    purchaseCount: 2187,
-    reviews: [
+    salesHistory: [
       {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c8d"),
-        rating: 4,
-        comment: "The twist at the end was unexpected. Good page-turner.",
-        createdAt: new Date("2023-12-12T19:21:33.000Z"),
-        updatedAt: new Date("2023-12-12T19:21:33.000Z"),
-      },
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c8e"),
-        rating: 3,
-        comment: "Started strong but I found the ending a bit contrived.",
-        createdAt: new Date("2024-01-03T20:15:43.000Z"),
-        updatedAt: new Date("2024-01-03T20:15:43.000Z"),
-      },
+        date: new Date("2023-11-15"),
+        quantity: 8,
+        revenue: 127.92,
+        orderId: new mongoose.Types.ObjectId("60d21b4667d0d8992e611a06")
+      }
     ],
-    createdAt: new Date("2023-09-11T12:54:32.000Z"),
-    updatedAt: new Date("2024-01-25T14:22:18.000Z"),
-  },
-  {
-    title: "Educated",
-    author: "Tara Westover",
-    description:
-      "A memoir about a woman who grew up in a survivalist family in Idaho and her journey to education.",
-    price: 16.99,
-    originalPrice: 20.99,
-    isbn: "9780399590504",
-    language: "English",
-    format: "Hardcover, 352 pages",
-    publishDate: new Date("2018-02-20"),
-    publisher: "Random House",
-    image: "https://cdn2.penguin.com.au/covers/original/9780099511021.jpg",
-    tag: "BEST SELLER",
-    category: "Memoir",
-    affiliateLink: "https://bookstore.com/educated",
-    inventory: 41,
-    purchaseCount: 1823,
-    reviews: [
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c8f"),
-        rating: 5,
-        comment:
-          "Powerful story of resilience and self-determination. Couldn't put it down.",
-        createdAt: new Date("2023-10-05T10:12:54.000Z"),
-        updatedAt: new Date("2023-10-05T10:12:54.000Z"),
-      },
-    ],
-    createdAt: new Date("2023-08-22T11:32:45.000Z"),
-    updatedAt: new Date("2024-02-15T17:23:19.000Z"),
-  },
-  {
-    title: "Project Hail Mary",
-    author: "Andy Weir",
-    description:
-      "A lone astronaut must save the earth from disaster in this new adventure from the author of The Martian.",
-    price: 22.99,
-    originalPrice: 28.99,
-    isbn: "9780593135204",
-    language: "English",
-    format: "Hardcover, 496 pages",
-    publishDate: new Date("2021-05-04"),
-    publisher: "Ballantine Books",
-    image:
-      "https://planetary.s3.amazonaws.com/web/assets/pictures/project-hail-mary-cover-weir.jpg",
-    tag: "",
-    category: "Science Fiction",
-    affiliateLink: "https://bookstore.com/project-hail-mary",
-    inventory: 52,
-    purchaseCount: 1562,
-    reviews: [
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c90"),
-        rating: 5,
-        comment:
-          "Even better than The Martian! The science is fascinating and the characters are compelling.",
-        createdAt: new Date("2023-11-08T14:23:45.000Z"),
-        updatedAt: new Date("2023-11-08T14:23:45.000Z"),
-      },
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c91"),
-        rating: 5,
-        comment:
-          "A perfect blend of humor, science, and heart. Rocky is my favorite character ever.",
-        createdAt: new Date("2023-12-19T21:34:12.000Z"),
-        updatedAt: new Date("2023-12-19T21:34:12.000Z"),
-      },
-    ],
-    createdAt: new Date("2023-07-05T16:43:22.000Z"),
-    updatedAt: new Date("2024-03-01T09:12:43.000Z"),
-  },
-  {
-    title: "The Psychology of Money",
-    author: "Morgan Housel",
-    description:
-      "Timeless lessons on wealth, greed, and happiness, exploring how money moves around in an economy and how people think about it.",
-    price: 18.99,
-    originalPrice: 22.99,
-    isbn: "9780857197689",
-    language: "English",
-    format: "Paperback, 256 pages",
-    publishDate: new Date("2020-09-08"),
-    publisher: "Harriman House",
-    image:
-      "https://i.pinimg.com/736x/e6/a2/c6/e6a2c6b650e79f1095f381f54a8bab69.jpg",
-    tag: "BEST SELLER",
-    category: "Finance",
-    affiliateLink: "https://bookstore.com/psychology-money",
-    inventory: 67,
-    purchaseCount: 2913,
-    reviews: [
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c92"),
-        rating: 5,
-        comment:
-          "Changed my relationship with money completely. Simple yet profound concepts.",
-        createdAt: new Date("2023-09-25T11:23:43.000Z"),
-        updatedAt: new Date("2023-09-25T11:23:43.000Z"),
-      },
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c93"),
-        rating: 4,
-        comment:
-          "Great insights into behavioral finance. Should be required reading in high school.",
-        createdAt: new Date("2023-10-17T15:32:11.000Z"),
-        updatedAt: new Date("2023-10-17T15:32:11.000Z"),
-      },
-    ],
-    createdAt: new Date("2023-06-28T13:21:43.000Z"),
-    updatedAt: new Date("2024-02-20T10:15:33.000Z"),
-  },
-  {
-    title: "Where the Crawdads Sing",
-    author: "Delia Owens",
-    description:
-      "A novel about an abandoned girl who raised herself in the marshes of North Carolina.",
-    price: 15.99,
-    originalPrice: 18.99,
-    isbn: "9780735219090",
-    language: "English",
-    format: "Hardcover, 384 pages",
-    publishDate: new Date("2018-08-14"),
-    publisher: "G.P. Putnam's Sons",
-    image:
-      "https://s26162.pcdn.co/wp-content/uploads/sites/2/2018/08/where-the-crawdads-sing.jpg",
-    tag: "BEST SELLER",
-    category: "Fiction",
-    affiliateLink: "https://bookstore.com/crawdads",
-    inventory: 29,
-    purchaseCount: 3542,
-    reviews: [
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c94"),
-        rating: 4,
-        comment:
-          "Beautiful writing and evocative setting. The ending surprised me.",
-        createdAt: new Date("2023-10-12T17:23:42.000Z"),
-        updatedAt: new Date("2023-10-12T17:23:42.000Z"),
-      },
-    ],
-    createdAt: new Date("2023-08-15T14:32:11.000Z"),
-    updatedAt: new Date("2024-01-20T11:45:22.000Z"),
-  },
-  {
-    title: "The Four Winds",
-    author: "Kristin Hannah",
-    description:
-      "A story of love, heroism, and hope, set during the Great Depression and the Dust Bowl era.",
-    price: 18.99,
-    originalPrice: 22.99,
-    isbn: "9781250178602",
-    language: "English",
-    format: "Hardcover, 464 pages",
-    publishDate: new Date("2021-02-02"),
-    publisher: "St. Martin's Press",
-    image: "https://m.media-amazon.com/images/I/71jAoWfIgmL._SL1500_.jpg",
-    tag: "BEST SELLER",
-    category: "Historical Fiction",
-    affiliateLink: "https://bookstore.com/four-winds",
-    inventory: 34,
-    purchaseCount: 1765,
-    reviews: [
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c95"),
-        rating: 5,
-        comment:
-          "Heart-wrenching and beautiful. Kristin Hannah's best work yet.",
-        createdAt: new Date("2023-11-05T12:43:21.000Z"),
-        updatedAt: new Date("2023-11-05T12:43:21.000Z"),
-      },
-      {
-        user: new mongoose.Types.ObjectId("60d21b4667d0d8992e610c96"),
-        rating: 4,
-        comment:
-          "A powerful portrait of American resilience. Made me appreciate what past generations endured.",
-        createdAt: new Date("2023-12-07T19:32:11.000Z"),
-        updatedAt: new Date("2023-12-07T19:32:11.000Z"),
-      },
-    ],
-    createdAt: new Date("2023-09-20T11:23:45.000Z"),
-    updatedAt: new Date("2024-02-11T14:32:56.000Z"),
-  },
+    createdAt: new Date("2023-05-20"),
+    updatedAt: new Date("2024-02-28")
+  }
 ];
 
-// Example of how to insert this data into MongoDB
+// Insert function remains the same
 async function insertSampleData() {
   try {
-    // Assuming you have a Book model already defined
     const Book = require("./models/Book");
-
-    // Clear existing data (optional)
     await Book.deleteMany({});
-
-    // Insert the sample data
     const result = await Book.insertMany(bookSampleData);
-
-    console.log(`${result.length} books successfully inserted`);
+    console.log(`Inserted ${result.length} books`);
     return result;
   } catch (error) {
     console.error("Error inserting sample data:", error);

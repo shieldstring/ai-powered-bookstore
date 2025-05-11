@@ -18,11 +18,6 @@ const reviewSchema = new mongoose.Schema(
       maxlength: [500, "Comment cannot exceed 500 characters"],
       trim: true,
     },
-    helpfulVotes: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
   },
   {
     timestamps: true,
@@ -148,19 +143,16 @@ const bookSchema = new mongoose.Schema(
         message: (props) => `${props.value} is not a valid image URL!`,
       },
     },
-    images: [
-      {
-        type: String,
-        validate: {
-          validator: function (v) {
-            return /^(https?:\/\/).+\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(
-              v
-            );
-          },
-          message: (props) => `${props.value} is not a valid image URL!`,
+    images: {
+      type: String,
+      validate: {
+        validator: function (v) {
+          return /^(https?:\/\/).+\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(v);
         },
+        message: (props) => `${props.value} is not a valid image URL!`,
       },
-    ],
+    },
+
     category: {
       type: String,
       required: [true, "Category is required"],
