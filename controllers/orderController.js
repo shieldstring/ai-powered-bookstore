@@ -13,19 +13,28 @@ const createOrder = async (req, res) => {
     totalPrice,
     paymentResult,
   } = req.body;
-
+  
   // Validate required fields
   if (!orderItems || orderItems.length === 0) {
     return res.status(400).json({ message: "No order items" });
   }
-
+  
   try {
     // Check stock availability
     for (const item of orderItems) {
-      const book = await Book.findById(item._id);
-      if (!book) {
-        return res.status(404).json({ message: `Book ${item._id} not found` });
+      // Fix: Extract the book ID correctly regardless of whether it comes as item._id or item.book
+      const bookId = item.book || item._id;
+      
+      if (!bookId) {
+        return res.status(400).json({ message: `Missing book ID in order items` });
       }
+      
+      const book = await Book.findById(bookId);
+      
+      if (!book) {
+        return res.status(404).json({ message: `Book ${bookId} not found` });
+      }
+      
       if (book.countInStock < item.quantity) {
         return res.status(400).json({
           message: `Not enough stock for ${item.name}`,
@@ -35,7 +44,7 @@ const createOrder = async (req, res) => {
 
     const session = await mongoose.startSession();
     session.startTransaction();
-
+    
     try {
       // Create the order
       const order = await Order.create(
@@ -43,7 +52,7 @@ const createOrder = async (req, res) => {
           {
             user: req.user._id,
             orderItems: orderItems.map((item) => ({
-              book: item._id,
+              book: item.book || item._id, // Fix: use the correct book ID field
               name: item.name,
               quantity: item.quantity,
               image: item.image,
@@ -61,16 +70,18 @@ const createOrder = async (req, res) => {
         ],
         { session }
       );
-
+      
       // Update book quantities
       for (const item of orderItems) {
+        const bookId = item.book || item._id; // Fix: use the correct book ID field
+        
         await Book.findByIdAndUpdate(
-          item._id,
+          bookId,
           { $inc: { countInStock: -item.quantity } },
           { session }
         );
       }
-
+      
       // Handle payment transaction if exists
       if (paymentResult?.id && paymentResult.id !== "simulated_payment_id") {
         await Transaction.findOneAndUpdate(
@@ -79,14 +90,14 @@ const createOrder = async (req, res) => {
           { session }
         );
       }
-
+      
       // Clear cart
       await Cart.findOneAndUpdate(
         { user: req.user._id },
         { $set: { items: [] } },
         { session }
       );
-
+      
       await session.commitTransaction();
       res.status(201).json(order[0]);
     } catch (error) {
