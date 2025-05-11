@@ -143,15 +143,6 @@ const bookSchema = new mongoose.Schema(
         message: (props) => `${props.value} is not a valid image URL!`,
       },
     },
-    images: {
-      type: String,
-      validate: {
-        validator: function (v) {
-          return /^(https?:\/\/).+\.(jpg|jpeg|png|webp|avif|gif|svg)$/i.test(v);
-        },
-        message: (props) => `${props.value} is not a valid image URL!`,
-      },
-    },
 
     category: {
       type: String,
@@ -192,13 +183,12 @@ const bookSchema = new mongoose.Schema(
         message: "{VALUE} is not a valid category",
       },
     },
-    tags: [
-      {
-        type: String,
-        maxlength: [30, "Tag cannot exceed 30 characters"],
-        trim: true,
-      },
-    ],
+    tag: {
+      type: String,
+      maxlength: [30, "Tag cannot exceed 30 characters"],
+      trim: true,
+    },
+
     affiliateLink: {
       type: String,
       validate: {
