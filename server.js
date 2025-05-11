@@ -131,6 +131,36 @@ io.on("connection", (socket) => {
   });
 });
 
+// In your webhook handler
+app.post('/webhook', express.raw({type: 'application/json'}), (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  
+  let event;
+  
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+  } catch (err) {
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+  
+  // Handle the event
+  switch (event.type) {
+    case 'payment_intent.succeeded':
+      const paymentIntent = event.data.object;
+      // Update order status in your database
+      // Find order by paymentIntent.id and mark as paid
+      break;
+    case 'payment_intent.payment_failed':
+      // Handle failed payment
+      break;
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+  
+  res.status(200).send();
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

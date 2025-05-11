@@ -4,35 +4,58 @@ const Transaction = require("../models/Transaction");
 
 // Create a payment intent
 const createPaymentIntent = async (req, res) => {
-  const { amount } = req.body;
+  const { amount, currency = 'usd' } = req.body;
+  
   try {
-    // Default to USD if currency isn't provided
-    const currency = req.body.currency || "usd";
+    // Validate amount based on currency
+    const minimumAmounts = {
+      usd: 50,    // $0.50
+      eur: 50,    // €0.50
+      gbp: 30,    // £0.30
+      // Add other supported currencies
+    };
+
+    const minimumAmount = minimumAmounts[currency.toLowerCase()] || 50;
+    
+    if (amount < minimumAmount) {
+      return res.status(400).json({
+        message: `Minimum payment amount is ${minimumAmount/100} ${currency.toUpperCase()}`
+      });
+    }
+
+    // Add idempotency key to prevent duplicate payments
+    const idempotencyKey = req.headers['idempotency-key'] || uuidv4();
 
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency,
-      metadata: { userId: req.user._id.toString() },
+      metadata: { 
+        userId: req.user._id.toString(),
+        cartId: req.body.cartId // Optional: track which cart this is for
+      },
+      automatic_payment_methods: { enabled: true }
+    }, {
+      idempotencyKey
     });
 
-    // Log the transaction
+    // Log transaction
     await Transaction.create({
       user: req.user._id,
       amount: amount / 100,
+      currency,
       type: "purchase",
-      description: "Book purchase",
-      paymentIntentId: paymentIntent.id,
+      status: "requires_payment_method",
+      paymentIntentId: paymentIntent.id
     });
 
-    // Return both client secret and payment intent ID
     res.json({
       clientSecret: paymentIntent.client_secret,
       paymentIntentId: paymentIntent.id,
     });
   } catch (error) {
-    console.error("Payment intent creation error:", error);
+    console.error("Payment intent error:", error);
     res.status(500).json({
-      message: error.message || "Server error creating payment intent",
+      message: error.message || "Payment processing error"
     });
   }
 };
