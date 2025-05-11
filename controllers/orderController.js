@@ -14,28 +14,30 @@ const createOrder = async (req, res) => {
     totalPrice,
     paymentResult,
   } = req.body;
-  
+
   // Validate required fields
   if (!orderItems || orderItems.length === 0) {
     return res.status(400).json({ message: "No order items" });
   }
-  
+
   try {
     // Check stock availability
     for (const item of orderItems) {
       // Use bookId or id as they appear in the request
       const bookId = item.bookId || item.id;
-      
+
       if (!bookId) {
-        return res.status(400).json({ message: "Missing book ID in order items" });
+        return res
+          .status(400)
+          .json({ message: "Missing book ID in order items" });
       }
-      
+
       const book = await Book.findById(bookId);
-      
+
       if (!book) {
         return res.status(404).json({ message: `Book ${bookId} not found` });
       }
-      
+
       if (book.countInStock < item.quantity) {
         return res.status(400).json({
           message: `Not enough stock for ${book.name}`,
@@ -45,19 +47,26 @@ const createOrder = async (req, res) => {
 
     const session = await mongoose.startSession();
     session.startTransaction();
-    
+
     try {
       // Fetch book details for each order item to include in order
       const enhancedOrderItems = [];
-      
+
       for (const item of orderItems) {
-        const bookId = item.bookId || item.id;
-        const book = await Book.findById(bookId).lean();
-        
-        if (!book) {
-          throw new Error(`Book ${bookId} not found during order creation`);
+        const bookId = item.book;
+
+        if (!bookId) {
+          return res
+            .status(400)
+            .json({ message: "Missing book ID in order items" });
         }
-        
+
+        const book = await Book.findById(bookId).lean();
+
+        if (!book) {
+          return res.status(404).json({ message: `Book ${bookId} not found` });
+        }
+
         enhancedOrderItems.push({
           book: bookId,
           name: book.name,
@@ -66,9 +75,8 @@ const createOrder = async (req, res) => {
           price: book.price || 0,
         });
       }
-      
+
       // Create the order with enhanced details
-      // Making sure we match your exact Order model structure
       const order = await Order.create(
         [
           {
@@ -87,18 +95,18 @@ const createOrder = async (req, res) => {
         ],
         { session }
       );
-      
+
       // Update book quantities
       for (const item of orderItems) {
-        const bookId = item.bookId || item.id;
-        
+        const bookId = item.book;
+
         await Book.findByIdAndUpdate(
           bookId,
           { $inc: { countInStock: -item.quantity } },
           { session }
         );
       }
-      
+
       // Handle payment transaction if exists
       if (paymentResult?.id && paymentResult.id !== "simulated_payment_id") {
         await Transaction.findOneAndUpdate(
@@ -107,14 +115,14 @@ const createOrder = async (req, res) => {
           { session }
         );
       }
-      
+
       // Clear cart
       await Cart.findOneAndUpdate(
         { user: req.user._id },
         { $set: { items: [] } },
         { session }
       );
-      
+
       await session.commitTransaction();
       res.status(201).json(order[0]);
     } catch (error) {
