@@ -1,10 +1,11 @@
 const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const Transaction = require("../models/Transaction");
+const { v4: uuidv4 } = require('uuid'); // Make sure to have this for idempotency
 
-// Create a payment intent
-const createPaymentIntent = async (req, res) => {
-  const { amount, currency = 'usd' } = req.body;
+// Create a checkout session
+const createCheckoutSession = async (req, res) => {
+  const { amount, currency = 'usd', items, cartId, successUrl, cancelUrl } = req.body;
   
   try {
     // Validate amount based on currency
@@ -23,17 +24,34 @@ const createPaymentIntent = async (req, res) => {
       });
     }
 
-    // Add idempotency key to prevent duplicate payments
+    // Add idempotency key to prevent duplicate sessions
     const idempotencyKey = req.headers['idempotency-key'] || uuidv4();
 
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount,
-      currency,
+    // Format line items for Checkout
+    const lineItems = items ? items : [
+      {
+        price_data: {
+          currency,
+          product_data: {
+            name: "Your purchase",
+          },
+          unit_amount: amount,
+        },
+        quantity: 1,
+      }
+    ];
+
+    // Create the checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: lineItems,
+      mode: 'payment',
+      success_url: successUrl || `${process.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: cancelUrl || `${process.env.FRONTEND_URL}/payment/cancel`,
       metadata: { 
         userId: req.user._id.toString(),
-        cartId: req.body.cartId // Optional: track which cart this is for
+        cartId: cartId || null
       },
-      automatic_payment_methods: { enabled: true }
     }, {
       idempotencyKey
     });
@@ -44,32 +62,33 @@ const createPaymentIntent = async (req, res) => {
       amount: amount / 100,
       currency,
       type: "purchase",
-      status: "requires_payment_method",
-      paymentIntentId: paymentIntent.id
+      status: "pending",
+      checkoutSessionId: session.id
     });
 
+    // Return the session URL - client will redirect to this URL
     res.json({
-      clientSecret: paymentIntent.client_secret,
-      paymentIntentId: paymentIntent.id,
+      sessionId: session.id,
+      url: session.url
     });
   } catch (error) {
-    console.error("Payment intent error:", error);
+    console.error("Checkout session error:", error);
     res.status(500).json({
       message: error.message || "Payment processing error"
     });
   }
 };
 
-// Get payment status
-const getPaymentStatus = async (req, res) => {
-  const { paymentId } = req.params;
+// Get checkout session status
+const getCheckoutStatus = async (req, res) => {
+  const { sessionId } = req.params;
 
   try {
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentId);
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
 
-    // Find if this payment is associated with an order
+    // Find if this session is associated with an order
     const transaction = await Transaction.findOne({
-      paymentIntentId: paymentId,
+      checkoutSessionId: sessionId,
     });
     let orderId = null;
 
@@ -78,12 +97,12 @@ const getPaymentStatus = async (req, res) => {
     }
 
     res.json({
-      status: paymentIntent.status,
+      status: session.payment_status,
       orderId,
     });
   } catch (error) {
-    console.error("Error retrieving payment status:", error);
-    res.status(500).json({ message: "Error retrieving payment status" });
+    console.error("Error retrieving checkout status:", error);
+    res.status(500).json({ message: "Error retrieving checkout status" });
   }
 };
 
@@ -106,35 +125,54 @@ const handleWebhook = async (req, res) => {
 
   // Handle specific events
   switch (event.type) {
-    case "payment_intent.succeeded":
-      const paymentIntent = event.data.object;
-      console.log("PaymentIntent succeeded:", paymentIntent.id);
+    case "checkout.session.completed":
+      const session = event.data.object;
+      console.log("Checkout session completed:", session.id);
 
-      // Update transaction and order status
+      // Update transaction status
       const transaction = await Transaction.findOne({
-        paymentIntentId: paymentIntent.id,
+        checkoutSessionId: session.id,
       });
-      if (transaction && transaction.orderId) {
-        const Order = require("../models/Order");
-        const order = await Order.findById(transaction.orderId);
-        if (order) {
-          order.isPaid = true;
-          order.paidAt = Date.now();
-          order.paymentResult = {
-            id: paymentIntent.id,
-            status: "succeeded",
-            update_time: new Date().toISOString(),
-            email_address: paymentIntent.receipt_email || "",
-          };
-          await order.save();
+      
+      if (transaction) {
+        transaction.status = "completed";
+        await transaction.save();
+        
+        // If transaction is linked to an order, update it
+        if (transaction.orderId) {
+          const Order = require("../models/Order");
+          const order = await Order.findById(transaction.orderId);
+          if (order) {
+            order.isPaid = true;
+            order.paidAt = Date.now();
+            order.paymentResult = {
+              id: session.id,
+              status: "completed",
+              update_time: new Date().toISOString(),
+              email_address: session.customer_details?.email || "",
+            };
+            await order.save();
+          }
         }
       }
       break;
 
-    case "payment_intent.payment_failed":
-      const failedPayment = event.data.object;
-      console.log("Payment failed:", failedPayment.id);
+    case "checkout.session.expired":
+      const expiredSession = event.data.object;
+      console.log("Checkout session expired:", expiredSession.id);
+      
+      // Update transaction status
+      const expiredTransaction = await Transaction.findOne({
+        checkoutSessionId: expiredSession.id,
+      });
+      
+      if (expiredTransaction) {
+        expiredTransaction.status = "expired";
+        await expiredTransaction.save();
+      }
       break;
+      
+
 
     default:
       console.log(`Unhandled event type: ${event.type}`);
@@ -144,7 +182,7 @@ const handleWebhook = async (req, res) => {
 };
 
 module.exports = {
-  createPaymentIntent,
-  getPaymentStatus,
+  createCheckoutSession,
+  getCheckoutStatus,
   handleWebhook,
 };
