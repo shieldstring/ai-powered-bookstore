@@ -8,10 +8,6 @@ const Transaction = require("../models/Transaction");
 const createOrder = async (req, res) => {
   const {
     orderItems,
-    shippingAddress,
-    paymentMethod,
-    itemsPrice,
-    totalPrice,
     paymentResult,
   } = req.body;
 
@@ -23,7 +19,6 @@ const createOrder = async (req, res) => {
   try {
     // Check stock availability
     for (const item of orderItems) {
-      
       const bookId = item.book;
 
       if (!bookId) {
@@ -50,51 +45,26 @@ const createOrder = async (req, res) => {
 
     try {
       // Fetch book details for each order item to include in order
-      const enhancedOrderItems = [];
+      const enhancedOrderItems = await Promise.all(
+        orderItems.map(async (item) => {
+          const book = await Book.findById(item.book).lean();
+          if (!book) throw new Error(`Book ${item.book} not found`);
 
-      for (const item of orderItems) {
-        const bookId = item.book;
-
-        if (!bookId) {
-          return res
-            .status(400)
-            .json({ message: "Missing book ID in order items" });
-        }
-
-        const book = await Book.findById(bookId).lean();
-
-        if (!book) {
-          return res.status(404).json({ message: `Book ${bookId} not found` });
-        }
-
-        enhancedOrderItems.push({
-          book: bookId,
-          name: book.name,
-          quantity: item.quantity,
-          image: book.image || "",
-          price: book.price || 0,
-        });
-      }
-
-      // Create the order with enhanced details
-      const order = await Order.create(
-        [
-          {
-            user: req.user._id,
-            orderItems: enhancedOrderItems,
-            shippingAddress,
-            paymentMethod,
-            paymentResult: paymentResult || {},
-            itemsPrice: itemsPrice || totalPrice, // Using itemsPrice as it's in your model
-            taxPrice: req.body.taxPrice || 0,
-            shippingPrice: req.body.shippingPrice || 0,
-            totalPrice,
-            isPaid: false,
-            status: "pending",
-          },
-        ],
-        { session }
+          return {
+            book: item.book,
+            name: item.name || book.name, // Use frontend name first
+            image: item.image || book.image, // Fall back to book.image
+            price: item.price || book.price, // Fall back to book.price
+            quantity: item.quantity,
+          };
+        })
       );
+
+      const order = new Order({
+        ...req.body,
+        orderItems: enhancedOrderItems, // Uses merged data
+        user: req.user._id,
+      });
 
       // Update book quantities
       for (const item of orderItems) {
