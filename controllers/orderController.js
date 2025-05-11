@@ -23,8 +23,8 @@ const createOrder = async (req, res) => {
   try {
     // Check stock availability
     for (const item of orderItems) {
-      // Use bookId or id as they appear in the request
-      const bookId = item.bookId || item.id;
+      
+      const bookId = item.book;
 
       if (!bookId) {
         return res
