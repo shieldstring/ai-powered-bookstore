@@ -6,10 +6,7 @@ const Transaction = require("../models/Transaction");
 
 // Create a new order
 const createOrder = async (req, res) => {
-  const {
-    orderItems,
-    paymentResult,
-  } = req.body;
+  const { orderItems, paymentResult } = req.body;
 
   // Validate required fields
   if (!orderItems || orderItems.length === 0) {
@@ -59,6 +56,10 @@ const createOrder = async (req, res) => {
           };
         })
       );
+
+      if (!req.user?._id) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
 
       const order = new Order({
         ...req.body,
