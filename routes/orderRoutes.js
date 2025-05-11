@@ -8,6 +8,7 @@ const {
   updateOrderStatus,
   cancelOrder,
   deleteOrder,
+  verifyPayment
 } = require('../controllers/orderController');
 
 const router = express.Router();
@@ -15,6 +16,7 @@ const router = express.Router();
 router.post('/', protect, createOrder); // Create a new order
 router.get('/', protect, getOrders); // Get all orders for the user
 router.get('/:id', protect, getOrderById); // Get a single order by ID
+router.post('/verify-payment', protect, verifyPayment); //verify
 router.get('/admin/all', protect, admin, getAllOrders); // Get all orders (admin only)
 router.put('/:id/status', protect, admin, updateOrderStatus); // Update order status (admin only)
 router.put('/:id/cancel', protect, admin, cancelOrder); // Cancel an order (admin only)

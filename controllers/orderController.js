@@ -401,6 +401,66 @@ const deleteOrder = async (req, res) => {
   }
 };
 
+const verifyPayment = async (req, res) => {
+  const { sessionId, orderId } = req.body;
+  
+  if (!sessionId || !orderId) {
+    return res.status(400).json({ message: "Missing session ID or order ID" });
+  }
+  
+  try {
+    // Find the order
+    const order = await Order.findById(orderId);
+    
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
+    }
+    
+    // Check if this payment has already been processed
+    if (order.isPaid) {
+      return res.status(400).json({ message: "Order is already paid" });
+    }
+    
+    // Verify with Stripe
+    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    
+    if (!session) {
+      return res.status(404).json({ message: "Payment session not found" });
+    }
+    
+    if (session.payment_status === 'paid') {
+      // Update order
+      order.isPaid = true;
+      order.paidAt = Date.now();
+      order.paymentResult = {
+        id: session.id,
+        status: session.payment_status,
+        update_time: new Date().toISOString(),
+        email_address: session.customer_details?.email || '',
+      };
+      
+      const updatedOrder = await order.save();
+      
+      // Clear user's cart in database
+      if (req.user?._id) {
+        await Cart.findOneAndUpdate(
+          { user: req.user._id },
+          { $set: { items: [] } }
+        );
+      }
+      
+      res.status(200).json(updatedOrder);
+    } else {
+      res.status(400).json({ message: "Payment not completed" });
+    }
+  } catch (error) {
+    console.error("Payment verification error:", error);
+    res.status(500).json({
+      message: error.message || "Error verifying payment",
+    });
+  }
+};
 module.exports = {
   createOrder,
   getOrders,
@@ -410,4 +470,5 @@ module.exports = {
   cancelOrder,
   deleteOrder,
   updateOrderPaymentStatus,
+  verifyPayment,
 };
