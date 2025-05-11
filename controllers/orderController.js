@@ -22,33 +22,11 @@ const createOrder = async (req, res) => {
   try {
     // Check stock availability
     for (const item of orderItems) {
-      // Debug log to see what's coming in
-      console.log('Processing order item:', item);
-      
-      // Fix: Extract the book ID correctly, handling all possible structures
-      let bookId;
-      
-      if (item.book) {
-        // If book is an object with _id
-        if (typeof item.book === 'object' && item.book !== null && item.book._id) {
-          bookId = item.book._id;
-        }
-        // If book is a string (already an ID)
-        else if (typeof item.book === 'string') {
-          bookId = item.book;
-        }
-      } 
-      // Fallback to _id if no book property
-      else if (item._id) {
-        bookId = item._id;
-      }
+      // Use bookId or id as they appear in the request
+      const bookId = item.bookId || item.id;
       
       if (!bookId) {
-        console.error('Invalid order item structure:', item);
-        return res.status(400).json({ 
-          message: `Missing book ID in order items`, 
-          item: JSON.stringify(item)
-        });
+        return res.status(400).json({ message: "Missing book ID in order items" });
       }
       
       const book = await Book.findById(bookId);
@@ -59,7 +37,7 @@ const createOrder = async (req, res) => {
       
       if (book.countInStock < item.quantity) {
         return res.status(400).json({
-          message: `Not enough stock for ${item.name}`,
+          message: `Not enough stock for ${book.name}`,
         });
       }
     }
@@ -68,35 +46,37 @@ const createOrder = async (req, res) => {
     session.startTransaction();
     
     try {
-      // Create the order
+      // Fetch book details for each order item to include in order
+      const enhancedOrderItems = [];
+      
+      for (const item of orderItems) {
+        const bookId = item.bookId || item.id;
+        const book = await Book.findById(bookId).lean();
+        
+        if (!book) {
+          throw new Error(`Book ${bookId} not found during order creation`);
+        }
+        
+        enhancedOrderItems.push({
+          book: bookId,
+          name: book.name,
+          quantity: item.quantity,
+          image: book.image || "",
+          price: book.price || 0,
+        });
+      }
+      
+      // Create the order with enhanced details
+      // Making sure we match your exact Order model structure
       const order = await Order.create(
         [
           {
             user: req.user._id,
-            orderItems: orderItems.map((item) => {
-              // Extract the book ID using the same logic as above
-              let bookId;
-              if (item.book) {
-                if (typeof item.book === 'object' && item.book !== null && item.book._id) {
-                  bookId = item.book._id;
-                } else if (typeof item.book === 'string') {
-                  bookId = item.book;
-                }
-              } else if (item._id) {
-                bookId = item._id;
-              }
-              
-              return {
-                book: bookId,
-                name: item.name,
-                quantity: item.quantity,
-                image: item.image,
-                price: item.price,
-              };
-            }),
+            orderItems: enhancedOrderItems,
             shippingAddress,
             paymentMethod,
-            itemsPrice,
+            paymentResult: paymentResult || {},
+            itemsPrice: itemsPrice || totalPrice, // Using itemsPrice as it's in your model
             taxPrice: req.body.taxPrice || 0,
             shippingPrice: req.body.shippingPrice || 0,
             totalPrice,
@@ -109,23 +89,7 @@ const createOrder = async (req, res) => {
       
       // Update book quantities
       for (const item of orderItems) {
-        // Extract the book ID using the same logic as above
-        let bookId;
-        if (item.book) {
-          if (typeof item.book === 'object' && item.book !== null && item.book._id) {
-            bookId = item.book._id;
-          } else if (typeof item.book === 'string') {
-            bookId = item.book;
-          }
-        } else if (item._id) {
-          bookId = item._id;
-        }
-        
-        if (!bookId) {
-          // This should never happen if our earlier validation works, but just in case
-          await session.abortTransaction();
-          return res.status(400).json({ message: `Missing book ID when updating inventory` });
-        }
+        const bookId = item.bookId || item.id;
         
         await Book.findByIdAndUpdate(
           bookId,
