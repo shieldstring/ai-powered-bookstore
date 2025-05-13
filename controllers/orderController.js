@@ -3,6 +3,7 @@ const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Book = require("../models/Book");
 const Transaction = require("../models/Transaction");
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Create a new order
 const createOrder = async (req, res) => {
