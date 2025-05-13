@@ -401,6 +401,7 @@ const deleteOrder = async (req, res) => {
   }
 };
 
+// Verify Payment
 const verifyPayment = async (req, res) => {
   const { sessionId, orderId } = req.body;
   
@@ -409,10 +410,14 @@ const verifyPayment = async (req, res) => {
   }
   
   try {
+    // Log the incoming data for debugging
+    console.log("Verifying payment:", { sessionId, orderId });
+    
     // Find the order
     const order = await Order.findById(orderId);
     
     if (!order) {
+      console.error(`Order not found with ID: ${orderId}`);
       return res.status(404).json({ message: "Order not found" });
     }
     
@@ -422,7 +427,6 @@ const verifyPayment = async (req, res) => {
     }
     
     // Verify with Stripe
-    const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
     const session = await stripe.checkout.sessions.retrieve(sessionId);
     
     if (!session) {
@@ -438,9 +442,19 @@ const verifyPayment = async (req, res) => {
         status: session.payment_status,
         update_time: new Date().toISOString(),
         email_address: session.customer_details?.email || '',
+        payment_intent: session.payment_intent || '',
       };
       
       const updatedOrder = await order.save();
+      
+      // Update transaction if it exists
+      await Transaction.findOneAndUpdate(
+        { checkoutSessionId: session.id },
+        { 
+          status: 'completed',
+          orderId: order._id
+        }
+      );
       
       // Clear user's cart in database
       if (req.user?._id) {
@@ -452,7 +466,10 @@ const verifyPayment = async (req, res) => {
       
       res.status(200).json(updatedOrder);
     } else {
-      res.status(400).json({ message: "Payment not completed" });
+      res.status(400).json({ 
+        message: "Payment not completed", 
+        status: session.payment_status 
+      });
     }
   } catch (error) {
     console.error("Payment verification error:", error);
@@ -461,6 +478,7 @@ const verifyPayment = async (req, res) => {
     });
   }
 };
+
 module.exports = {
   createOrder,
   getOrders,
