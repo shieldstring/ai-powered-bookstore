@@ -68,9 +68,26 @@ const createGroup = async (req, res) => {
 // Get all groups
 const getAllGroups = async (req, res) => {
   try {
+    // Get user ID from the authenticated request
+    const userId = req.user._id;
+    
+    // Find all groups and populate members
     const groups = await Group.find({}).populate("members", "name");
-    res.json(groups);
+    
+    // Add isMember field to each group
+    const groupsWithMembership = groups.map(group => {
+      // Convert to plain object so we can add properties
+      const groupObj = group.toObject();
+      
+      // Check if the current user is a member of this group
+      groupObj.isMember = group.members.some(member => member._id.toString() === userId.toString());
+      
+      return groupObj;
+    });
+    
+    res.json(groupsWithMembership);
   } catch (error) {
+    console.error("Error getting all groups:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
