@@ -13,6 +13,9 @@ const {
   unlikeDiscussion,
   addCommentToDiscussion,
   deleteComment,
+  joinGroup,
+  leaveGroup,
+  getGroupDetails,
 } = require("../controllers/groupController");
 
 const router = express.Router();
@@ -21,8 +24,11 @@ const router = express.Router();
 router.post("/", protect, createGroup);
 router.get("/", protect, getAllGroups); // Get all groups
 router.get("/user", protect, getUserGroups); // Get groups the user belongs to
+router.get("/:groupId", protect, getGroupDetails); // Get detailed information about a specific group
 router.put("/:id", protect, editGroup); // Edit a group
 router.delete("/:id", protect, deleteGroup); // Delete a group
+router.post("/:groupId/join", protect, joinGroup); // Join a group
+router.post("/:groupId/leave", protect, leaveGroup); // Leave a group
 
 // Discussion routes
 router.post("/discussions", protect, addDiscussion);

@@ -121,6 +121,181 @@ const deleteGroup = async (req, res) => {
   }
 };
 
+// Join a group
+const joinGroup = async (req, res) => {
+  const { groupId } = req.params;
+  try {
+    const group = await Group.findById(groupId);
+    
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+    
+    // Check if user is already a member
+    if (group.members.includes(req.user._id)) {
+      return res.status(400).json({ message: "You are already a member of this group" });
+    }
+    
+    // Add user to group members
+    group.members.push(req.user._id);
+    await group.save();
+    
+    // Get group owner to notify them
+    const populatedGroup = await Group.findById(groupId).populate("members", "name");
+    
+    // Identify group owner (assuming first member is the owner)
+    const ownerId = populatedGroup.members[0]._id;
+    
+    if (ownerId.toString() !== req.user._id.toString()) {
+      // Create database notification for group owner
+      await createNotification(
+        ownerId,
+        req.user._id,
+        "groupJoin",
+        `${req.user.name || "Someone"} joined your group "${group.name}"`,
+        {
+          group: groupId
+        }
+      );
+      
+      // Send push notification to group owner
+      await NotificationService.sendPushNotification(
+        ownerId,
+        `${req.user.name || "Someone"} joined your group "${group.name}"`,
+        {
+          title: "New Group Member",
+          type: "groupJoin",
+          data: {
+            groupId: groupId
+          }
+        }
+      );
+      
+      // Emit real-time notification
+      req.io.to(ownerId.toString()).emit("newGroupMember", {
+        groupId,
+        userId: req.user._id
+      });
+    }
+    
+    res.json(populatedGroup);
+  } catch (error) {
+    console.error("Error joining group:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+
+// Leave a group
+const leaveGroup = async (req, res) => {
+  const { groupId } = req.params;
+  try {
+    const group = await Group.findById(groupId);
+    
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+    
+    // Check if user is a member
+    if (!group.members.some(member => member.toString() === req.user._id.toString())) {
+      return res.status(400).json({ message: "You are not a member of this group" });
+    }
+    
+    // Check if user is the only member (possibly the owner)
+    if (group.members.length === 1 && group.members[0].toString() === req.user._id.toString()) {
+      return res.status(400).json({ 
+        message: "You are the only member of this group. Please delete the group instead of leaving."
+      });
+    }
+    
+    // Remove user from group members
+    group.members = group.members.filter(
+      member => member.toString() !== req.user._id.toString()
+    );
+    await group.save();
+    
+    // Get group owner to notify them (assuming first member is the owner)
+    const populatedGroup = await Group.findById(groupId).populate("members", "name");
+    const ownerId = populatedGroup.members[0]._id;
+    
+    if (ownerId.toString() !== req.user._id.toString()) {
+      // Create database notification for group owner
+      await createNotification(
+        ownerId,
+        req.user._id,
+        "groupLeave",
+        `${req.user.name || "Someone"} left your group "${group.name}"`,
+        {
+          group: groupId
+        }
+      );
+      
+      // Send push notification to group owner
+      await NotificationService.sendPushNotification(
+        ownerId,
+        `${req.user.name || "Someone"} left your group "${group.name}"`,
+        {
+          title: "Group Member Left",
+          type: "groupLeave",
+          data: {
+            groupId: groupId
+          }
+        }
+      );
+      
+      // Emit real-time notification
+      req.io.to(ownerId.toString()).emit("memberLeftGroup", {
+        groupId,
+        userId: req.user._id
+      });
+    }
+    
+    res.json({ message: "Successfully left the group" });
+  } catch (error) {
+    console.error("Error leaving group:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get group details
+const getGroupDetails = async (req, res) => {
+  const { groupId } = req.params;
+  try {
+    const group = await Group.findById(groupId)
+      .populate("members", "name avatar")
+      // You can add more population here if needed
+      // For example, you might want to include recent discussions
+      // .populate({ path: 'discussions', options: { limit: 5, sort: { createdAt: -1 } } })
+    
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+    
+    // Add isMember field
+    const isMember = group.members.some(
+      member => member._id.toString() === req.user._id.toString()
+    );
+    
+    // Count discussions
+    const discussionCount = await Discussion.countDocuments({ group: groupId });
+    
+    // Add formatted response with additional useful information
+    const response = {
+      ...group.toObject(),
+      isMember,
+      memberCount: group.members.length,
+      discussionCount,
+      isOwner: group.members.length > 0 && 
+        group.members[0]._id.toString() === req.user._id.toString()
+    };
+    
+    res.json(response);
+  } catch (error) {
+    console.error("Error getting group details:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Add a discussion to a group
 const addDiscussion = async (req, res) => {
   const { groupId, message, image, video } = req.body;
@@ -499,4 +674,7 @@ module.exports = {
   addCommentToDiscussion,
   deleteComment,
   sendPushNotification,
+  joinGroup,
+  leaveGroup,        // Add the new function here
+  getGroupDetails,   // Add the new function here
 };
