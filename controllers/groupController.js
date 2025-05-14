@@ -147,35 +147,37 @@ const joinGroup = async (req, res) => {
     const ownerId = populatedGroup.members[0]._id;
     
     if (ownerId.toString() !== req.user._id.toString()) {
-      // Create database notification for group owner
-      await createNotification(
-        ownerId,
-        req.user._id,
-        "groupJoin",
-        `${req.user.name || "Someone"} joined your group "${group.name}"`,
-        {
-          group: groupId
-        }
-      );
-      
-      // Send push notification to group owner
-      await NotificationService.sendPushNotification(
-        ownerId,
-        `${req.user.name || "Someone"} joined your group "${group.name}"`,
-        {
-          title: "New Group Member",
-          type: "groupJoin",
-          data: {
-            groupId: groupId
+      try {
+        // Create database notification for group owner
+        await createNotification(
+          ownerId,
+          req.user._id,
+          "groupJoin",
+          `${req.user.name || "Someone"} joined your group "${group.name}"`,
+          {
+            group: groupId
           }
-        }
-      );
+        );
+      } catch (notificationError) {
+        console.error("Error creating join notification:", notificationError);
+      }
       
-      // Emit real-time notification
-      req.io.to(ownerId.toString()).emit("newGroupMember", {
-        groupId,
-        userId: req.user._id
-      });
+      try {
+        // Send push notification to group owner
+        await NotificationService.sendPushNotification(
+          ownerId,
+          `${req.user.name || "Someone"} joined your group "${group.name}"`,
+          {
+            title: "New Group Member",
+            type: "groupJoin",
+            data: {
+              groupId: groupId
+            }
+          }
+        );
+      } catch (pushError) {
+        console.error("Error sending push notification:", pushError);
+      }
     }
     
     res.json(populatedGroup);
@@ -184,7 +186,6 @@ const joinGroup = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 
 // Leave a group
 const leaveGroup = async (req, res) => {
@@ -243,11 +244,6 @@ const leaveGroup = async (req, res) => {
         }
       );
       
-      // Emit real-time notification
-      req.io.to(ownerId.toString()).emit("memberLeftGroup", {
-        groupId,
-        userId: req.user._id
-      });
     }
     
     res.json({ message: "Successfully left the group" });
@@ -319,8 +315,6 @@ const addDiscussion = async (req, res) => {
     const group = await Group.findById(groupId);
 
     if (group) {
-      // Send real-time notification to group members via Socket.IO
-      req.io.to(`group:${groupId}`).emit("newDiscussion", populatedDiscussion);
 
       // Send push notifications to group members except the poster
       await NotificationService.sendGroupNotification(
@@ -416,39 +410,41 @@ const likeDiscussion = async (req, res) => {
     const group = await Group.findById(discussion.group);
     const groupName = group ? group.name : 'a group';
     
-    // Emit a real-time notification to the discussion owner
-    req.io.to(discussion.user.toString()).emit('discussionLiked', { 
-      discussionId, 
-      userId: req.user._id 
-    });
-    
     // Only send notification if the like is not from the discussion owner
     if (discussion.user.toString() !== req.user._id.toString()) {
       // Create database notification
-      await createNotification(
-        discussion.user,
-        req.user._id,
-        'discussionLike',
-        `${req.user.name || 'Someone'} liked your post in ${groupName}`,
-        {
-          group: discussion.group,
-          discussion: discussionId
-        }
-      );
+      try {
+        await createNotification(
+          discussion.user,
+          req.user._id,
+          'discussionLike',
+          `${req.user.name || 'Someone'} liked your post in ${groupName}`,
+          {
+            group: discussion.group,
+            discussion: discussionId
+          }
+        );
+      } catch (notificationError) {
+        console.error("Error creating notification:", notificationError);
+      }
       
       // Send push notification to discussion owner
-      await NotificationService.sendPushNotification(
-        discussion.user, 
-        `${req.user.name || 'Someone'} liked your post in ${groupName}`,
-        {
-          title: 'Your Post Received a Like',
-          type: 'discussionLike',
-          data: {
-            discussionId: discussionId,
-            groupId: discussion.group.toString()
+      try {
+        await NotificationService.sendPushNotification(
+          discussion.user, 
+          `${req.user.name || 'Someone'} liked your post in ${groupName}`,
+          {
+            title: 'Your Post Received a Like',
+            type: 'discussionLike',
+            data: {
+              discussionId: discussionId,
+              groupId: discussion.group.toString()
+            }
           }
-        }
-      );
+        );
+      } catch (pushError) {
+        console.error("Error sending push notification:", pushError);
+      }
     }
     
     // Return the updated discussion with populated fields
@@ -459,10 +455,10 @@ const likeDiscussion = async (req, res) => {
     
     res.json(updatedDiscussion);
   } catch (error) {
+    console.error("Error in likeDiscussion:", error);
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 
 // Unlike a discussion
 const unlikeDiscussion = async (req, res) => {
@@ -527,77 +523,79 @@ const addCommentToDiscussion = async (req, res) => {
       mentions.push({ name: mentionedName, id: mentionedId });
     }
     
-    // Emit a real-time notification to the discussion owner
-    req.io.to(discussion.user.toString()).emit('discussionCommented', { 
-      discussionId, 
-      userId: req.user._id,
-      comment: newComment
-    });
-    
     // Only notify if the commenter is not the discussion owner
     if (discussion.user.toString() !== req.user._id.toString()) {
-      // Create database notification for discussion owner
-      await createNotification(
-        discussion.user,
-        req.user._id,
-        'discussionComment',
-        `${req.user.name || 'Someone'} commented on your post in ${groupName}: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`,
-        {
-          group: discussion.group,
-          discussion: discussionId
-        }
-      );
-      
-      // Send push notification
-      await NotificationService.sendPushNotification(
-        discussion.user,
-        `${req.user.name || 'Someone'} commented on your post in ${groupName}`,
-        {
-          title: 'New Comment on Your Post',
-          type: 'discussionComment',
-          data: {
-            discussionId: discussionId,
-            groupId: discussion.group.toString()
-          }
-        }
-      );
-    }
-    
-    // Send notifications for @mentions
-    for (const mention of mentions) {
-      if (mention.id !== req.user._id.toString()) {
-        // Create database notification for mentioned user
+      try {
+        // Create database notification for discussion owner
         await createNotification(
-          mention.id,
+          discussion.user,
           req.user._id,
-          'commentMention',
-          `${req.user.name || 'Someone'} mentioned you in a comment in ${groupName}`,
+          'discussionComment',
+          `${req.user.name || 'Someone'} commented on your post in ${groupName}: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`,
           {
             group: discussion.group,
             discussion: discussionId
           }
         );
-        
+      } catch (notificationError) {
+        console.error("Error creating notification:", notificationError);
+      }
+      
+      try {
         // Send push notification
         await NotificationService.sendPushNotification(
-          mention.id,
-          `${req.user.name || 'Someone'} mentioned you in a comment in ${groupName}`,
+          discussion.user,
+          `${req.user.name || 'Someone'} commented on your post in ${groupName}`,
           {
-            title: 'You Were Mentioned',
-            type: 'commentMention',
+            title: 'New Comment on Your Post',
+            type: 'discussionComment',
             data: {
               discussionId: discussionId,
               groupId: discussion.group.toString()
             }
           }
         );
+      } catch (pushError) {
+        console.error("Error sending push notification:", pushError);
+      }
+    }
+    
+    // Send notifications for @mentions
+    for (const mention of mentions) {
+      if (mention.id !== req.user._id.toString()) {
+        try {
+          // Create database notification for mentioned user
+          await createNotification(
+            mention.id,
+            req.user._id,
+            'commentMention',
+            `${req.user.name || 'Someone'} mentioned you in a comment in ${groupName}`,
+            {
+              group: discussion.group,
+              discussion: discussionId
+            }
+          );
+        } catch (mentionError) {
+          console.error("Error creating mention notification:", mentionError);
+        }
         
-        // Emit real-time notification
-        req.io.to(mention.id).emit('mentionedInComment', {
-          discussionId,
-          commentId: newComment._id,
-          mentionedBy: req.user._id
-        });
+        try {
+          // Send push notification
+          await NotificationService.sendPushNotification(
+            mention.id,
+            `${req.user.name || 'Someone'} mentioned you in a comment in ${groupName}`,
+            {
+              title: 'You Were Mentioned',
+              type: 'commentMention',
+              data: {
+                discussionId: discussionId,
+                groupId: discussion.group.toString()
+              }
+            }
+          );
+        } catch (pushError) {
+          console.error("Error sending push notification for mention:", pushError);
+        }
       }
     }
     
@@ -609,10 +607,10 @@ const addCommentToDiscussion = async (req, res) => {
     
     res.json(updatedDiscussion);
   } catch (error) {
+    console.error("Error in addCommentToDiscussion:", error);
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 
 // Delete a comment from a discussion
 const deleteComment = async (req, res) => {
