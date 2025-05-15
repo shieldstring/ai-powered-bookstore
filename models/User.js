@@ -145,21 +145,25 @@ userSchema.methods.addFcmToken = async function (
   token,
   deviceInfo = "unknown"
 ) {
+  // Ensure deviceInfo is a string
+  let deviceString =
+    typeof deviceInfo === "string" ? deviceInfo : "unknown device";
+
   // Check if token already exists
   const existingTokenIndex = this.fcmTokens.findIndex((t) => t.token === token);
   if (existingTokenIndex !== -1) {
     // Update existing token
     this.fcmTokens[existingTokenIndex] = {
       token,
-      device: deviceInfo,
-      lastUsed: Date.now(),
+      device: deviceString,
+      lastUpdated: Date.now(),
     };
   } else {
     // Add new token
     this.fcmTokens.push({
       token,
-      device: deviceInfo,
-      lastUsed: Date.now(),
+      device: deviceString,
+      lastUpdated: Date.now(),
     });
   }
   await this.save();

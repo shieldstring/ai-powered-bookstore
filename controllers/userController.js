@@ -131,8 +131,27 @@ const updateFcmToken = async (req, res) => {
       return res.status(400).json({ message: "Token is required" });
     }
     
+    // Convert deviceInfo object to string if it's an object
+    let deviceString = "unknown";
+    if (deviceInfo) {
+      if (typeof deviceInfo === 'string') {
+        deviceString = deviceInfo;
+      } else {
+        // Create a descriptive string from deviceInfo object
+        try {
+          const platform = deviceInfo.platform || 'unknown platform';
+          const browser = deviceInfo.userAgent ? 
+            deviceInfo.userAgent.split(' ')[0].split('/')[0] : 'unknown browser';
+          deviceString = `${platform} - ${browser}`;
+        } catch (err) {
+          console.error("Error parsing deviceInfo:", err);
+          deviceString = "unknown device";
+        }
+      }
+    }
+    
     // Add or update token
-    await req.user.addFcmToken(token, deviceInfo);
+    await req.user.addFcmToken(token, deviceString);
     
     res.json({
       message: "FCM token registered successfully",
@@ -171,7 +190,7 @@ const getFcmTokens = async (req, res) => {
     const tokenInfos = req.user.fcmTokens.map((t) => ({
       id: t._id,
       device: t.device,
-      lastUsed: t.lastUpdated, // Fix: Using lastUpdated from user model instead of lastUsed
+      lastUsed: t.lastUpdated,
     }));
     
     res.json(tokenInfos);
@@ -230,6 +249,7 @@ const updateNotificationPreferences = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 module.exports = {
   getUserProfile,
   updateProfile,
