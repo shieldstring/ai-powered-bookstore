@@ -1,6 +1,10 @@
 const Book = require("../models/Book");
 const mongoose = require("mongoose");
 
+// Configuration for recommendation service
+const RECOMMENDATION_SERVICE_URL = process.env.RECOMMENDATION_SERVICE_URL || 'http://localhost:5000';
+const DEFAULT_RECOMMENDATION_COUNT = 6;
+
 // Helper function for pagination
 const getPaginationOptions = (query) => ({
   page: parseInt(query.page) || 1,
@@ -412,15 +416,160 @@ const bulkUpdateInventory = async (req, res) => {
 };
 
 // Get book recommendations
+// const getRecommendations = async (req, res) => {
+//   try {
+//     // Basic recommendation logic - can be enhanced with ML
+//     const recommendations = await Book.aggregate([
+//       { $match: { isActive: true } },
+//       { $sample: { size: 10 } }, // Random sample
+//       { $sort: { averageRating: -1, purchaseCount: -1 } },
+//       { $limit: 6 },
+//       { $project: { 
+//         title: 1,
+//         author: 1,
+//         price: 1,
+//         originalPrice: 1,
+//         image: 1,
+//         averageRating: 1,
+//         reviewCount: 1,
+//         discountPercentage: 1
+//       }}
+//     ]);
+
+//     res.json({ 
+//       success: true,
+//       count: recommendations.length,
+//       data: recommendations 
+//     });
+//   } catch (error) {
+//     console.error("Error getting recommendations:", error);
+//     res.status(500).json({ 
+//       success: false,
+//       message: "Server error while getting recommendations",
+//       error: error.message 
+//     });
+//   }
+// };
+
 const getRecommendations = async (req, res) => {
   try {
-    // Basic recommendation logic - can be enhanced with ML
-    const recommendations = await Book.aggregate([
-      { $match: { isActive: true } },
-      { $sample: { size: 10 } }, // Random sample
+    // Extract query parameters
+    const userId = req.query.userId || req.user?._id; // Get user ID from query or authenticated user
+    const topN = parseInt(req.query.limit || DEFAULT_RECOMMENDATION_COUNT);
+    
+    // Validate user ID if provided
+    if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format"
+      });
+    }
+    
+    // Validate book ID if provided for similar books recommendations
+    if (req.query.bookId && !mongoose.Types.ObjectId.isValid(req.query.bookId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid book ID format"
+      });
+    }
+    
+    // Option 1: Get personalized recommendations if user ID is available
+    if (userId) {
+      try {
+        console.log(`Getting personalized recommendations for user ${userId}`);
+        
+        // Call Python recommendation service
+        const response = await axios.get(`${RECOMMENDATION_SERVICE_URL}/recommend`, {
+          params: {
+            user_id: userId.toString(),
+            top_n: topN
+          },
+          timeout: 5000 // 5 second timeout to prevent long waits
+        });
+        
+        // Check if recommendations were successfully returned
+        if (response.data.success && response.data.recommendations.length > 0) {
+          // Convert string IDs to ObjectIds for MongoDB
+          const objectIds = response.data.recommendations.map(id => 
+            mongoose.Types.ObjectId(id.toString()));
+          
+          // Fetch full book details from MongoDB
+          const recommendations = await Book.find({
+            _id: { $in: objectIds },
+            isActive: true
+          }).select('title author price originalPrice image averageRating reviewCount discountPercentage');
+          
+          // Return recommendations if found
+          if (recommendations.length > 0) {
+            return res.json({
+              success: true,
+              source: "personalized",
+              count: recommendations.length,
+              data: recommendations
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error calling recommendation service:", error.message);
+        // Don't return an error, fall back to default recommendations
+      }
+    }
+    
+    // Option 2: Get similar book recommendations if bookId is provided
+    if (req.query.bookId && mongoose.Types.ObjectId.isValid(req.query.bookId)) {
+      try {
+        const bookId = mongoose.Types.ObjectId(req.query.bookId);
+        const book = await Book.findById(bookId);
+        
+        if (book) {
+          // Get books in the same category with similar attributes
+          const similarBooks = await Book.find({
+            _id: { $ne: bookId }, // Exclude current book
+            isActive: true,
+            category: book.category, // Same category
+          })
+          .sort({ averageRating: -1, purchaseCount: -1 })
+          .limit(topN)
+          .select('title author price originalPrice image averageRating reviewCount discountPercentage');
+          
+          if (similarBooks.length > 0) {
+            return res.json({
+              success: true,
+              source: "similar",
+              count: similarBooks.length,
+              data: similarBooks
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error getting similar books:", error.message);
+        // Fall back to default recommendations
+      }
+    }
+    
+    // Option 3: Default recommendations as fallback
+    console.log("Using default recommendations as fallback");
+    
+    // Build the match conditions for default recommendations
+    const matchCondition = { isActive: true };
+    
+    // Add category filter if provided
+    if (req.query.category) {
+      matchCondition.category = req.query.category;
+    }
+    
+    // Exclude current book if bookId is provided
+    if (req.query.bookId && mongoose.Types.ObjectId.isValid(req.query.bookId)) {
+      matchCondition._id = { $ne: mongoose.Types.ObjectId(req.query.bookId) };
+    }
+    
+    // Get default recommendations using MongoDB aggregation
+    const defaultRecommendations = await Book.aggregate([
+      { $match: matchCondition },
+      { $sample: { size: Math.min(topN * 2, 20) } }, // Get more samples for better sorting
       { $sort: { averageRating: -1, purchaseCount: -1 } },
-      { $limit: 6 },
-      { $project: { 
+      { $limit: topN },
+      { $project: {
         title: 1,
         author: 1,
         price: 1,
@@ -431,18 +580,21 @@ const getRecommendations = async (req, res) => {
         discountPercentage: 1
       }}
     ]);
-
-    res.json({ 
+    
+    // Return default recommendations
+    return res.json({
       success: true,
-      count: recommendations.length,
-      data: recommendations 
+      source: "default",
+      count: defaultRecommendations.length,
+      data: defaultRecommendations
     });
+    
   } catch (error) {
     console.error("Error getting recommendations:", error);
-    res.status(500).json({ 
+    return res.status(500).json({
       success: false,
       message: "Server error while getting recommendations",
-      error: error.message 
+      error: error.message
     });
   }
 };

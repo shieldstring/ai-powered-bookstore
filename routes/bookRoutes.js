@@ -15,8 +15,8 @@ const {
 const router = express.Router();
 
 router.get("/", getBooks);
-router.get("/:id", getBookById); // Get a single book by ID
 router.get("/recommendations", protect, getRecommendations); // Get AI-curated recommendations
+router.get("/:id", getBookById); // Get a single book by ID
 router.post("/", protect, admin, addBook); // Only admins can add books
 router.put("/:id", protect, admin, updateBook); // Only admins can edit books
 router.delete("/:id", protect, admin, deleteBook); // Only admins can delete books
