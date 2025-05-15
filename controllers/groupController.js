@@ -312,6 +312,7 @@ const getGroupDetails = async (req, res) => {
 // Add a discussion to a group
 const addDiscussion = async (req, res) => {
   const { groupId, message, image, video } = req.body;
+  
   try {
     const discussion = await Discussion.create({
       group: groupId,
@@ -322,23 +323,39 @@ const addDiscussion = async (req, res) => {
       likes: [],
       comments: [],
     });
-
+    
     // Populate the user field to return complete data
     const populatedDiscussion = await Discussion.findById(
       discussion._id
     ).populate("user", "name avatar");
-
+    
     // Get group details to notify members
     const group = await Group.findById(groupId);
-
+    
     if (group) {
-
+      // Create notification message based on content type
+      let notificationText = "";
+      
+      if (message && message.trim() !== "") {
+        // If there's a text message, use it in the notification
+        notificationText = `${message.substring(0, 50)}${message.length > 50 ? "..." : ""}`;
+      } else if (image) {
+        // If no message but has image
+        notificationText = "shared an image";
+      } else if (video) {
+        // If no message but has video
+        notificationText = "shared a video";
+      } else {
+        // Generic fallback
+        notificationText = "shared a post";
+      }
+      
+      const notificationMessage = `${req.user.name || "Someone"} posted in ${group.name}: ${notificationText}`;
+      
       // Send push notifications to group members except the poster
       await NotificationService.sendGroupNotification(
         groupId,
-        `${req.user.name || "Someone"} posted in ${
-          group.name
-        }: ${message.substring(0, 50)}${message.length > 50 ? "..." : ""}`,
+        notificationMessage,
         {
           title: "New Group Discussion",
           type: "newDiscussion",
@@ -349,20 +366,18 @@ const addDiscussion = async (req, res) => {
           },
         }
       );
-
+      
       // Create database notifications for each member
       const memberIds = group.members
         .map((id) => id.toString())
         .filter((id) => id !== req.user._id.toString());
-
+        
       for (const memberId of memberIds) {
         await createNotification(
           memberId,
           req.user._id,
           "newDiscussion",
-          `${req.user.name || "Someone"} posted in ${
-            group.name
-          }: ${message.substring(0, 50)}${message.length > 50 ? "..." : ""}`,
+          notificationMessage,
           {
             group: groupId,
             discussion: discussion._id,
@@ -370,9 +385,10 @@ const addDiscussion = async (req, res) => {
         );
       }
     }
-
+    
     res.status(201).json(populatedDiscussion);
   } catch (error) {
+    console.error("Error adding discussion:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
