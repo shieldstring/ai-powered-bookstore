@@ -167,11 +167,11 @@ const removeFcmToken = async (req, res) => {
 // Get FCM tokens information (without exposing actual tokens)
 const getFcmTokens = async (req, res) => {
   try {
-    // Return device info and last used date, but not the actual tokens for security
+    // Return device info and last updated date, but not the actual tokens for security
     const tokenInfos = req.user.fcmTokens.map((t) => ({
       id: t._id,
       device: t.device,
-      lastUsed: t.lastUsed,
+      lastUsed: t.lastUpdated, // Fix: Using lastUpdated from user model instead of lastUsed
     }));
     
     res.json(tokenInfos);
@@ -184,7 +184,18 @@ const getFcmTokens = async (req, res) => {
 // Update notification preferences
 const updateNotificationPreferences = async (req, res) => {
   try {
-    const { likes, comments, groupActivity, mentions, newFollowers } = req.body;
+    const { 
+      groupInvite,
+      newDiscussion,
+      discussionLike,
+      discussionComment,
+      commentMention,
+      groupActivity,
+      system,
+      referralActivity,
+      earningsUpdates,
+      tierChanges
+    } = req.body;
     
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -197,11 +208,16 @@ const updateNotificationPreferences = async (req, res) => {
     }
     
     // Update only the provided preferences
-    if (likes !== undefined) user.notificationPreferences.likes = likes;
-    if (comments !== undefined) user.notificationPreferences.comments = comments;
+    if (groupInvite !== undefined) user.notificationPreferences.groupInvite = groupInvite;
+    if (newDiscussion !== undefined) user.notificationPreferences.newDiscussion = newDiscussion;
+    if (discussionLike !== undefined) user.notificationPreferences.discussionLike = discussionLike;
+    if (discussionComment !== undefined) user.notificationPreferences.discussionComment = discussionComment;
+    if (commentMention !== undefined) user.notificationPreferences.commentMention = commentMention;
     if (groupActivity !== undefined) user.notificationPreferences.groupActivity = groupActivity;
-    if (mentions !== undefined) user.notificationPreferences.mentions = mentions;
-    if (newFollowers !== undefined) user.notificationPreferences.newFollowers = newFollowers;
+    if (system !== undefined) user.notificationPreferences.system = system;
+    if (referralActivity !== undefined) user.notificationPreferences.referralActivity = referralActivity;
+    if (earningsUpdates !== undefined) user.notificationPreferences.earningsUpdates = earningsUpdates;
+    if (tierChanges !== undefined) user.notificationPreferences.tierChanges = tierChanges;
     
     await user.save();
     
@@ -214,7 +230,6 @@ const updateNotificationPreferences = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
-
 module.exports = {
   getUserProfile,
   updateProfile,
