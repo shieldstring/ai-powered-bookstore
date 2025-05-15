@@ -125,15 +125,15 @@ const deleteUser = async (req, res) => {
 const updateFcmToken = async (req, res) => {
   try {
     const { token, deviceInfo } = req.body;
-
+    
     // Validate input
     if (!token) {
       return res.status(400).json({ message: "Token is required" });
     }
-
+    
     // Add or update token
     await req.user.addFcmToken(token, deviceInfo);
-
+    
     res.json({
       message: "FCM token registered successfully",
       tokenCount: req.user.fcmTokens.length,
@@ -148,15 +148,15 @@ const updateFcmToken = async (req, res) => {
 const removeFcmToken = async (req, res) => {
   try {
     const { token } = req.body;
-
+    
     // Validate input
     if (!token) {
       return res.status(400).json({ message: "Token is required" });
     }
-
+    
     // Remove token
     await req.user.removeFcmToken(token);
-
+    
     res.json({ message: "FCM token removed successfully" });
   } catch (error) {
     console.error("Error removing FCM token:", error);
@@ -173,7 +173,7 @@ const getFcmTokens = async (req, res) => {
       device: t.device,
       lastUsed: t.lastUsed,
     }));
-
+    
     res.json(tokenInfos);
   } catch (error) {
     console.error("Error getting FCM tokens:", error);
@@ -183,33 +183,28 @@ const getFcmTokens = async (req, res) => {
 
 // Update notification preferences
 const updateNotificationPreferences = async (req, res) => {
-  const { likes, comments, groupActivity, mentions, newFollowers } = req.body;
-
   try {
+    const { likes, comments, groupActivity, mentions, newFollowers } = req.body;
+    
     const user = await User.findById(req.user._id);
-
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-
+    
     // Initialize preferences if they don't exist
     if (!user.notificationPreferences) {
       user.notificationPreferences = {};
     }
-
+    
     // Update only the provided preferences
     if (likes !== undefined) user.notificationPreferences.likes = likes;
-    if (comments !== undefined)
-      user.notificationPreferences.comments = comments;
-    if (groupActivity !== undefined)
-      user.notificationPreferences.groupActivity = groupActivity;
-    if (mentions !== undefined)
-      user.notificationPreferences.mentions = mentions;
-    if (newFollowers !== undefined)
-      user.notificationPreferences.newFollowers = newFollowers;
-
+    if (comments !== undefined) user.notificationPreferences.comments = comments;
+    if (groupActivity !== undefined) user.notificationPreferences.groupActivity = groupActivity;
+    if (mentions !== undefined) user.notificationPreferences.mentions = mentions;
+    if (newFollowers !== undefined) user.notificationPreferences.newFollowers = newFollowers;
+    
     await user.save();
-
+    
     res.status(200).json({
       message: "Notification preferences updated",
       preferences: user.notificationPreferences,
