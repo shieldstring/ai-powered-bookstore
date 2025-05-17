@@ -10,6 +10,7 @@ const {
   updateFcmToken,
   removeFcmToken,
   updateNotificationPreferences,
+  getNotificationPreferences,
   getFcmTokens,
 } = require("../controllers/userController");
 const { getReferralStats } = require("../controllers/authController");
@@ -28,9 +29,10 @@ router.put("/:id/role", protect, admin, updateUserRole); // Update a user's role
 router.delete("/:id", protect, admin, deleteUser); // Delete a user (admin only)
 
 // Notification routes
-router.post("/fcm-tokens", protect, updateFcmToken); // Register/update FCM token
-router.delete("/fcm-tokens", protect, removeFcmToken); // Remove FCM token
-router.get("/fcm-tokens", protect, getFcmTokens); // Get FCM tokens info
-router.put("/notification-preferences", protect, updateNotificationPreferences); // Update notification preferences
+router.post("/fcm-tokens", protect, updateFcmToken);
+router.delete("/fcm-tokens", protect, removeFcmToken);
+router.get("/fcm-tokens", protect, getFcmTokens);
+router.get("/notification-preferences", protect, getNotificationPreferences);
+router.put("/notification-preferences", protect, updateNotificationPreferences);
 
 module.exports = router;

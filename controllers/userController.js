@@ -50,7 +50,6 @@ const updateProfile = async (req, res) => {
   }
 };
 
-
 // Get all users (admin only)
 const getAllUsers = async (req, res) => {
   try {
@@ -125,23 +124,24 @@ const deleteUser = async (req, res) => {
 const updateFcmToken = async (req, res) => {
   try {
     const { token, deviceInfo } = req.body;
-    
+
     // Validate input
     if (!token) {
       return res.status(400).json({ message: "Token is required" });
     }
-    
+
     // Convert deviceInfo object to string if it's an object
     let deviceString = "unknown";
     if (deviceInfo) {
-      if (typeof deviceInfo === 'string') {
+      if (typeof deviceInfo === "string") {
         deviceString = deviceInfo;
       } else {
         // Create a descriptive string from deviceInfo object
         try {
-          const platform = deviceInfo.platform || 'unknown platform';
-          const browser = deviceInfo.userAgent ? 
-            deviceInfo.userAgent.split(' ')[0].split('/')[0] : 'unknown browser';
+          const platform = deviceInfo.platform || "unknown platform";
+          const browser = deviceInfo.userAgent
+            ? deviceInfo.userAgent.split(" ")[0].split("/")[0]
+            : "unknown browser";
           deviceString = `${platform} - ${browser}`;
         } catch (err) {
           console.error("Error parsing deviceInfo:", err);
@@ -149,10 +149,10 @@ const updateFcmToken = async (req, res) => {
         }
       }
     }
-    
+
     // Add or update token
     await req.user.addFcmToken(token, deviceString);
-    
+
     res.json({
       message: "FCM token registered successfully",
       tokenCount: req.user.fcmTokens.length,
@@ -167,15 +167,15 @@ const updateFcmToken = async (req, res) => {
 const removeFcmToken = async (req, res) => {
   try {
     const { token } = req.body;
-    
+
     // Validate input
     if (!token) {
       return res.status(400).json({ message: "Token is required" });
     }
-    
+
     // Remove token
     await req.user.removeFcmToken(token);
-    
+
     res.json({ message: "FCM token removed successfully" });
   } catch (error) {
     console.error("Error removing FCM token:", error);
@@ -192,7 +192,7 @@ const getFcmTokens = async (req, res) => {
       device: t.device,
       lastUsed: t.lastUpdated,
     }));
-    
+
     res.json(tokenInfos);
   } catch (error) {
     console.error("Error getting FCM tokens:", error);
@@ -203,7 +203,7 @@ const getFcmTokens = async (req, res) => {
 // Update notification preferences
 const updateNotificationPreferences = async (req, res) => {
   try {
-    const { 
+    const {
       groupInvite,
       newDiscussion,
       discussionLike,
@@ -213,39 +213,82 @@ const updateNotificationPreferences = async (req, res) => {
       system,
       referralActivity,
       earningsUpdates,
-      tierChanges
+      tierChanges,
     } = req.body;
-    
+
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    
+
     // Initialize preferences if they don't exist
     if (!user.notificationPreferences) {
       user.notificationPreferences = {};
     }
-    
+
     // Update only the provided preferences
-    if (groupInvite !== undefined) user.notificationPreferences.groupInvite = groupInvite;
-    if (newDiscussion !== undefined) user.notificationPreferences.newDiscussion = newDiscussion;
-    if (discussionLike !== undefined) user.notificationPreferences.discussionLike = discussionLike;
-    if (discussionComment !== undefined) user.notificationPreferences.discussionComment = discussionComment;
-    if (commentMention !== undefined) user.notificationPreferences.commentMention = commentMention;
-    if (groupActivity !== undefined) user.notificationPreferences.groupActivity = groupActivity;
+    if (groupInvite !== undefined)
+      user.notificationPreferences.groupInvite = groupInvite;
+    if (newDiscussion !== undefined)
+      user.notificationPreferences.newDiscussion = newDiscussion;
+    if (discussionLike !== undefined)
+      user.notificationPreferences.discussionLike = discussionLike;
+    if (discussionComment !== undefined)
+      user.notificationPreferences.discussionComment = discussionComment;
+    if (commentMention !== undefined)
+      user.notificationPreferences.commentMention = commentMention;
+    if (groupActivity !== undefined)
+      user.notificationPreferences.groupActivity = groupActivity;
     if (system !== undefined) user.notificationPreferences.system = system;
-    if (referralActivity !== undefined) user.notificationPreferences.referralActivity = referralActivity;
-    if (earningsUpdates !== undefined) user.notificationPreferences.earningsUpdates = earningsUpdates;
-    if (tierChanges !== undefined) user.notificationPreferences.tierChanges = tierChanges;
-    
+    if (referralActivity !== undefined)
+      user.notificationPreferences.referralActivity = referralActivity;
+    if (earningsUpdates !== undefined)
+      user.notificationPreferences.earningsUpdates = earningsUpdates;
+    if (tierChanges !== undefined)
+      user.notificationPreferences.tierChanges = tierChanges;
+
     await user.save();
-    
+
     res.status(200).json({
       message: "Notification preferences updated",
       preferences: user.notificationPreferences,
     });
   } catch (error) {
     console.error("Error updating notification preferences:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get notification preferences
+const getNotificationPreferences = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Initialize preferences if they don't exist
+    if (!user.notificationPreferences) {
+      user.notificationPreferences = {
+        groupInvite: true,
+        newDiscussion: true,
+        discussionLike: true,
+        discussionComment: true,
+        commentMention: true,
+        groupActivity: true,
+        system: true,
+        referralActivity: true,
+        earningsUpdates: true,
+        tierChanges: true,
+      };
+      await user.save();
+    }
+
+    res.status(200).json({
+      data: user.notificationPreferences,
+    });
+  } catch (error) {
+    console.error("Error getting notification preferences:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
@@ -261,4 +304,5 @@ module.exports = {
   removeFcmToken,
   getFcmTokens,
   updateNotificationPreferences,
+  getNotificationPreferences,
 };
