@@ -167,12 +167,14 @@ userSchema.methods.addFcmToken = async function (
     });
   }
   await this.save();
+  return this;
 };
 
 // Remove FCM token
 userSchema.methods.removeFcmToken = async function (token) {
   this.fcmTokens = this.fcmTokens.filter((t) => t.token !== token);
   await this.save();
+  return this;
 };
 
 // Add a method to update the user's MLM tier

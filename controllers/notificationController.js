@@ -154,31 +154,95 @@ const getUnreadCount = async (req, res) => {
 };
 
 /**
+ * Get notification preferences
+ */
+const getNotificationPreferences = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    // Initialize preferences if they don't exist
+    if (!user.notificationPreferences) {
+      user.notificationPreferences = {
+        groupInvite: true,
+        newDiscussion: true,
+        discussionLike: true,
+        discussionComment: true,
+        commentMention: true,
+        groupActivity: true,
+        system: true,
+        referralActivity: true,
+        earningsUpdates: true,
+        tierChanges: true,
+      };
+      await user.save();
+    }
+
+    res.status(200).json({
+      data: user.notificationPreferences,
+    });
+  } catch (error) {
+    console.error("Error getting notification preferences:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/**
  * Update notification preferences
  */
 const updateNotificationPreferences = async (req, res) => {
   try {
-    const { preferences } = req.body;
-    
-    // Validate input
-    if (!preferences || typeof preferences !== 'object') {
-      return res.status(400).json({ message: "Invalid preferences" });
-    }
-    
-    // Update user preferences
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { $set: { notificationPreferences: preferences } },
-      { new: true }
-    );
-    
+    const {
+      groupInvite,
+      newDiscussion,
+      discussionLike,
+      discussionComment,
+      commentMention,
+      groupActivity,
+      system,
+      referralActivity,
+      earningsUpdates,
+      tierChanges,
+    } = req.body;
+
+    const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
-    
-    res.json({ 
+
+    // Initialize preferences if they don't exist
+    if (!user.notificationPreferences) {
+      user.notificationPreferences = {};
+    }
+
+    // Update only the provided preferences
+    if (groupInvite !== undefined)
+      user.notificationPreferences.groupInvite = groupInvite;
+    if (newDiscussion !== undefined)
+      user.notificationPreferences.newDiscussion = newDiscussion;
+    if (discussionLike !== undefined)
+      user.notificationPreferences.discussionLike = discussionLike;
+    if (discussionComment !== undefined)
+      user.notificationPreferences.discussionComment = discussionComment;
+    if (commentMention !== undefined)
+      user.notificationPreferences.commentMention = commentMention;
+    if (groupActivity !== undefined)
+      user.notificationPreferences.groupActivity = groupActivity;
+    if (system !== undefined) user.notificationPreferences.system = system;
+    if (referralActivity !== undefined)
+      user.notificationPreferences.referralActivity = referralActivity;
+    if (earningsUpdates !== undefined)
+      user.notificationPreferences.earningsUpdates = earningsUpdates;
+    if (tierChanges !== undefined)
+      user.notificationPreferences.tierChanges = tierChanges;
+
+    await user.save();
+
+    res.status(200).json({
       message: "Notification preferences updated",
-      preferences: user.notificationPreferences
+      preferences: user.notificationPreferences,
     });
   } catch (error) {
     console.error("Error updating notification preferences:", error);
@@ -239,5 +303,6 @@ module.exports = {
   deleteAllNotifications,
   getUnreadCount,
   updateNotificationPreferences,
+  getNotificationPreferences,
   createNotification
 };

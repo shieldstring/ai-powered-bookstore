@@ -1,14 +1,15 @@
 const express = require("express");
-const { protect } = require("../middleware/authMiddleware");
-const {
-  getNotifications,
-  markNotificationsAsRead,
-  markAllNotificationsAsRead,
-  deleteNotification,
-  deleteAllNotifications,
-  getUnreadCount,
+const { protect, admin } = require("../middleware/authMiddleware");
+const { 
+  getNotifications, 
+  markNotificationsAsRead, 
+  markAllNotificationsAsRead, 
+  deleteNotification, 
+  deleteAllNotifications, 
+  getUnreadCount, 
   updateNotificationPreferences,
-  createNotification
+  getNotificationPreferences,
+  createNotification 
 } = require("../controllers/notificationController");
 
 const router = express.Router();
@@ -19,11 +20,14 @@ router.use(protect);
 // GET routes
 router.get("/", getNotifications);
 router.get("/unread-count", getUnreadCount);
+router.get("/preferences", getNotificationPreferences);
 
 // POST routes
 router.post("/mark-read", markNotificationsAsRead);
 router.post("/mark-all-read", markAllNotificationsAsRead);
-router.post("/create", createNotification); // For admin/testing purposes
+
+// Admin routes
+router.post("/create", admin, createNotification); // Restricted to admin
 
 // PUT routes
 router.put("/preferences", updateNotificationPreferences);
