@@ -415,41 +415,6 @@ const bulkUpdateInventory = async (req, res) => {
   }
 };
 
-// Get book recommendations
-// const getRecommendations = async (req, res) => {
-//   try {
-//     // Basic recommendation logic - can be enhanced with ML
-//     const recommendations = await Book.aggregate([
-//       { $match: { isActive: true } },
-//       { $sample: { size: 10 } }, // Random sample
-//       { $sort: { averageRating: -1, purchaseCount: -1 } },
-//       { $limit: 6 },
-//       { $project: { 
-//         title: 1,
-//         author: 1,
-//         price: 1,
-//         originalPrice: 1,
-//         image: 1,
-//         averageRating: 1,
-//         reviewCount: 1,
-//         discountPercentage: 1
-//       }}
-//     ]);
-
-//     res.json({ 
-//       success: true,
-//       count: recommendations.length,
-//       data: recommendations 
-//     });
-//   } catch (error) {
-//     console.error("Error getting recommendations:", error);
-//     res.status(500).json({ 
-//       success: false,
-//       message: "Server error while getting recommendations",
-//       error: error.message 
-//     });
-//   }
-// };
 
 const getRecommendations = async (req, res) => {
   try {
