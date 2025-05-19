@@ -214,14 +214,14 @@ const updateBook = async (req, res) => {
     const { id } = req.params;
 
     // Validate book ID
-    if (!id) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
-        message: "Book ID is required",
+        message: "Invalid book ID format",
       });
     }
 
-    // Check if book exists
+    // Find existing book with current values
     const existingBook = await Book.findById(id);
     if (!existingBook) {
       return res.status(404).json({
@@ -230,69 +230,78 @@ const updateBook = async (req, res) => {
       });
     }
 
-    // Extract fields that shouldn't be updated directly
-    const {
-      reviews,
-      purchaseCount,
-      salesHistory,
-      viewCount,
-      wishlistCount,
-      createdAt,
-      updatedAt,
-      ...updateData
-    } = req.body;
+    // Process incoming data
+    const price = Math.round(Number(req.body.price));
+    const originalPrice = req.body.originalPrice
+      ? Math.round(Number(req.body.originalPrice))
+      : undefined;
 
-    // Handle special cases where empty strings should be converted to undefined
-    if (updateData.description === '') {
-      updateData.description = undefined;
-    }
-    if (updateData.tag === '') {
-      updateData.tag = undefined;
-    }
-    if (updateData.affiliateLink === '') {
-      updateData.affiliateLink = undefined;
-    }
-    if (updateData.publisher === '') {
-      updateData.publisher = undefined;
-    }
-    if (updateData.edition === '') {
-      updateData.edition = undefined;
-    }
-
-    // Update the book with validation
-    const updatedBook = await Book.findByIdAndUpdate(
-      id,
-      updateData,
-      {
-        new: true, // Return the updated document
-        runValidators: true, // Run schema validations
-        context: 'query' // Needed for some custom validators
-      }
-    );
-
-    // Return simplified response
-    res.status(200).json({
-      success: true,
-      message: "Book updated successfully",
-      data: {
-        id: updatedBook._id,
-        title: updatedBook.title,
-        author: updatedBook.author,
-        price: updatedBook.price,
-        inventory: updatedBook.inventory,
-        isActive: updatedBook.isActive,
-      },
+    // Debug logging
+    console.log("Price validation context:", {
+      incomingPrice: req.body.price,
+      incomingOriginalPrice: req.body.originalPrice,
+      processedPrice: price,
+      processedOriginalPrice: originalPrice,
+      existingPrice: existingBook.price,
+      existingOriginalPrice: existingBook.originalPrice,
     });
 
-  } catch (error) {
-    console.error("Error updating book:", error);
+    // Prepare update data
+    const updateData = {
+      ...req.body,
+      price,
+      originalPrice,
+      inventory: parseInt(req.body.inventory),
+      isActive: parseInt(req.body.inventory) > 0,
+      updatedAt: new Date(),
+    };
 
-    // Handle validation errors
-    if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map((err) => ({
-        path: err.path,
-        message: err.message,
-      }));
+    // Remove protected fields
+    delete updateData._id;
+    delete updateData.createdAt;
+    delete updateData.__v;
+
+    // Special handling for dimensions if provided
+    if (req.body.dimensions) {
+      if (typeof req.body.dimensions === "string") {
+        const dimParts = req.body.dimensions
+          .split("×")
+          .map((p) => parseFloat(p.trim()));
+        if (dimParts.length === 3) {
+          updateData.dimensions = {
+            height: dimParts[0],
+            width: dimParts[1],
+            thickness: dimParts[2],
+          };
+        }
+      } else {
+        updateData.dimensions = req.body.dimensions;
+      }
+    }
+
+    // IMPORTANT: Manually validate price relationship before saving
+    if (originalPrice !== undefined && originalPrice < price) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Original price must be greater than or equal to current price",
+        data: {
+          currentPrice: price,
+          originalPrice: originalPrice,
+        },
+      });
+    }
+
+    // Update the document in a way that ensures validators see correct context
+    Object.assign(existingBook, updateData);
+
+    // Manually validate the document
+    const validationError = existingBook.validateSync();
+    if (validationError) {
+      const errors = {};
+      Object.keys(validationError.errors).forEach((key) => {
+        errors[key] = validationError.errors[key].message;
+      });
       return res.status(400).json({
         success: false,
         message: "Validation failed",
@@ -300,26 +309,70 @@ const updateBook = async (req, res) => {
       });
     }
 
-    // Handle duplicate ISBN error
-    if (error.code === 11000 && error.keyPattern?.isbn) {
-      return res.status(400).json({
-        success: false,
-        message: "A book with this ISBN already exists",
+    // Save the updated document
+    const updatedBook = await existingBook.save();
+
+    // Handle inventory changes if modified
+    if (
+      req.body.inventory !== undefined &&
+      parseInt(req.body.inventory) !== existingBook.inventory
+    ) {
+      const adjustment = parseInt(req.body.inventory) - existingBook.inventory;
+
+      await Book.findByIdAndUpdate(id, {
+        $push: {
+          inventoryHistory: {
+            date: new Date(),
+            adjustment,
+            newValue: parseInt(req.body.inventory),
+            reason: "Admin update",
+            admin: req.user?._id || "system",
+          },
+        },
       });
     }
 
-    // Handle cast errors (invalid ObjectId)
-    if (error.name === "CastError") {
+    res.json({
+      success: true,
+      message: "Book updated successfully",
+      data: updatedBook,
+    });
+  } catch (error) {
+    console.error("Update error:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      keyPattern: error.keyPattern,
+    });
+
+    if (error.name === "ValidationError") {
+      const errors = {};
+      Object.keys(error.errors).forEach((key) => {
+        errors[key] = error.errors[key].message;
+      });
       return res.status(400).json({
         success: false,
-        message: "Invalid book ID format",
+        message: "Validation failed",
+        errors,
       });
     }
 
-    // Generic error
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({
+        success: false,
+        message: `${field} already exists`,
+        field,
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Internal server error",
+      ...(process.env.NODE_ENV === "development" && {
+        error: error.message,
+      }),
     });
   }
 };
