@@ -117,38 +117,99 @@ const getBookById = async (req, res) => {
 // Add a new book
 const addBook = async (req, res) => {
   try {
-    const bookData = {
-      ...req.body,
-      // Ensure required fields
-      title: req.body.title.trim(),
-      author: req.body.author.trim(),
-      price: parseFloat(req.body.price),
-      inventory: parseInt(req.body.inventory) || 0,
-      isActive: req.body.inventory > 0
-    };
-
-    const book = await Book.create(bookData);
+    // Validate required fields
+    const requiredFields = ['title', 'author', 'price', 'isbn', 'category', 'image'];
+    const missingFields = requiredFields.filter(field => !req.body[field]);
     
-    res.status(201).json({ 
-      success: true,
-      data: book 
-    });
-  } catch (error) {
-    console.error("Error adding book:", error);
-    
-    if (error.name === 'ValidationError') {
-      const messages = Object.values(error.errors).map(val => val.message);
-      return res.status(400).json({ 
+    if (missingFields.length > 0) {
+      return res.status(400).json({
         success: false,
-        message: "Validation error",
-        errors: messages 
+        message: `Missing required fields: ${missingFields.join(', ')}`
       });
     }
-    
-    res.status(500).json({ 
+
+    // Prepare book data with proper type conversions
+    const bookData = {
+      title: req.body.title.trim(),
+      author: req.body.author.trim(),
+      description: req.body.description?.trim() || '',
+      price: parseFloat(req.body.price),
+      originalPrice: req.body.originalPrice ? parseFloat(req.body.originalPrice) : undefined,
+      isbn: req.body.isbn.replace(/[-\s]/g, ''), // Remove hyphens/spaces from ISBN
+      language: req.body.language || 'English',
+      format: req.body.format || 'Paperback',
+      publishDate: req.body.publishedDate || req.body.publishDate || undefined,
+      publisher: req.body.publisher?.trim(),
+      image: req.body.image,
+      category: req.body.category,
+      inventory: parseInt(req.body.inventory || req.body.stock || 0),
+      pageCount: req.body.pages ? parseInt(req.body.pages) : undefined,
+      dimensions: req.body.dimensions ? {
+        height: parseFloat(req.body.dimensions.split('×')[0].trim()),
+        width: parseFloat(req.body.dimensions.split('×')[1].trim()),
+        thickness: parseFloat(req.body.dimensions.split('×')[2].trim())
+      } : undefined,
+      weight: req.body.weight ? parseFloat(req.body.weight) : undefined,
+      isActive: (parseInt(req.body.inventory || req.body.stock || 0) > 0)
+    };
+
+    // Validate originalPrice is greater than price if provided
+    if (bookData.originalPrice && bookData.originalPrice < bookData.price) {
+      return res.status(400).json({
+        success: false,
+        message: "Original price must be greater than or equal to current price"
+      });
+    }
+
+    console.log("Creating book with data:", bookData);
+    const book = await Book.create(bookData);
+    console.log("Book created successfully:", book._id);
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        id: book._id,
+        title: book.title,
+        author: book.author,
+        price: book.price
+      }
+    });
+
+  } catch (error) {
+    console.error("Error creating book:", {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      errors: error.errors
+    });
+
+    // Handle duplicate ISBN error
+    if (error.code === 11000 && error.keyPattern?.isbn) {
+      return res.status(400).json({
+        success: false,
+        message: "A book with this ISBN already exists"
+      });
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message
+      }));
+      
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors
+      });
+    }
+
+    // Handle other errors
+    return res.status(500).json({
       success: false,
-      message: "Server error while adding book",
-      error: error.message 
+      message: "Internal server error",
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };

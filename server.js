@@ -69,7 +69,6 @@ const paymentRoutes = require("./routes/paymentRoutes");
 const leaderboardRoutes = require("./routes/leaderboardRoutes");
 const challengeRoutes = require("./routes/challengeRoutes");
 const messageRoutes = require("./routes/messageRoutes");
-const recommendationRoutes = require("./routes/recommendationRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const levelRoutes = require("./routes/levelRoutes");
 const badgeRoutes = require("./routes/badgeRoutes");
@@ -89,7 +88,6 @@ app.use("/api/payment", protect, paymentRoutes); // Payment-related routes
 app.use("/api/leaderboard", leaderboardRoutes); // Leaderboard routes
 app.use("/api/challenges", challengeRoutes); // Challenge routes
 app.use("/api/messages", protect, messageRoutes); // Private messaging routes
-app.use("/api/recommendations", recommendationRoutes); // Recommendation routes
 app.use("/api/analytics", protect, admin, analyticsRoutes); // Analytics routes (admin only)
 app.use("/api/level", protect, levelRoutes); // Leveling and XP routes
 app.use("/api/badges", protect, badgeRoutes); // Badges and achievements routes
