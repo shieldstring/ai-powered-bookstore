@@ -200,26 +200,42 @@ const updateBook = async (req, res) => {
       });
     }
 
+    // Process dimensions if provided
+    let dimensions = existingBook.dimensions;
+    if (req.body.dimensions) {
+      if (typeof req.body.dimensions === 'string') {
+        const dimParts = req.body.dimensions.split('×').map(part => parseFloat(part.trim()));
+        if (dimParts.length === 3) {
+          dimensions = {
+            height: dimParts[0],
+            width: dimParts[1],
+            thickness: dimParts[2]
+          };
+        }
+      } else if (typeof req.body.dimensions === 'object') {
+        dimensions = req.body.dimensions;
+      }
+    }
+
     // Prepare update data
     const updateData = {
-      ...(req.method === 'PUT' ? { 
-        // For PUT (full update), include all required fields with defaults
-        title: req.body.title || existingBook.title,
-        author: req.body.author || existingBook.author,
-        price: req.body.price !== undefined ? parseFloat(req.body.price) : existingBook.price,
-        // ... other required fields
-      } : { 
-        // For PATCH (partial update), only include provided fields
-        ...req.body 
-      }),
-      
-      // Common processing for both methods
-      ...(req.body.price !== undefined && { price: parseFloat(req.body.price) }),
+      ...req.body,
+      ...(req.body.price && { price: parseFloat(req.body.price) }),
+      ...(req.body.originalPrice && { originalPrice: parseFloat(req.body.originalPrice) }),
       ...(req.body.inventory !== undefined && { 
         inventory: parseInt(req.body.inventory),
         isActive: parseInt(req.body.inventory) > 0
-      })
+      }),
+      ...(dimensions && { dimensions }),
+      ...(req.body.publishedDate && { 
+        publishedDate: new Date(req.body.publishedDate) 
+      }),
+      updatedAt: new Date()
     };
+
+    // Remove fields that shouldn't be updated
+    delete updateData._id;
+    delete updateData.createdAt;
 
     // Validate price relationship
     if (updateData.price && updateData.originalPrice) {
@@ -238,14 +254,20 @@ const updateBook = async (req, res) => {
       { 
         new: true,
         runValidators: true,
-        context: 'query',
-        overwrite: req.method === 'PUT' // Only for full updates
+        context: 'query'
       }
-    ).populate('reviews.user', 'name avatar');
+    );
+
+    if (!updatedBook) {
+      return res.status(404).json({
+        success: false,
+        message: "Book not found after update attempt"
+      });
+    }
 
     // Handle inventory changes
     if (req.body.inventory !== undefined && 
-        req.body.inventory !== existingBook.inventory) {
+        req.body.inventory !== existingBook.inventory.toString()) {
       const adjustment = parseInt(req.body.inventory) - existingBook.inventory;
       
       await Book.findByIdAndUpdate(id, {
@@ -254,8 +276,8 @@ const updateBook = async (req, res) => {
             date: new Date(),
             adjustment,
             newValue: parseInt(req.body.inventory),
-            reason: req.method === 'PUT' ? 'Full update' : 'Partial update',
-            admin: req.user._id
+            reason: 'Admin update',
+            admin: req.user?._id || 'system'
           }
         }
       });
@@ -263,12 +285,12 @@ const updateBook = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Book ${req.method === 'PUT' ? 'replaced' : 'updated'} successfully`,
+      message: "Book updated successfully",
       data: updatedBook
     });
 
   } catch (error) {
-    console.error(`Error ${req.method === 'PUT' ? 'replacing' : 'updating'} book:`, error);
+    console.error("Error updating book:", error);
     
     if (error.name === 'ValidationError') {
       const messages = Object.values(error.errors).map(val => val.message);
@@ -279,16 +301,16 @@ const updateBook = async (req, res) => {
       });
     }
     
-    if (error.code === 11000 && error.keyPattern?.isbn) {
+    if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: "ISBN already exists"
+        message: error.keyPattern?.isbn ? "ISBN already exists" : "Duplicate field value"
       });
     }
 
     res.status(500).json({
       success: false,
-      message: `Server error while ${req.method === 'PUT' ? 'replacing' : 'updating'} book`
+      message: "Server error while updating book"
     });
   }
 };
