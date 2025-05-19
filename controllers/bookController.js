@@ -249,56 +249,62 @@ const updateBook = async (req, res) => {
       return dimensions;
     };
 
-    // Process and validate price fields BEFORE creating updateData
+    // Process and validate price fields (as whole numbers)
     let processedPrice = existingBook.price;
     let processedOriginalPrice = existingBook.originalPrice;
 
     if (req.body.price !== undefined) {
-      processedPrice = Math.round(parseFloat(req.body.price) * 100) / 100;
+      processedPrice = Math.round(parseFloat(req.body.price));
+      if (isNaN(processedPrice) || processedPrice <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Price must be a positive whole number",
+          field: "price",
+        });
+      }
     }
 
     if (req.body.originalPrice !== undefined) {
       processedOriginalPrice = req.body.originalPrice
-        ? Math.round(parseFloat(req.body.originalPrice) * 100) / 100
+        ? Math.round(parseFloat(req.body.originalPrice))
         : null;
-    }
 
-    // Validate price relationship BEFORE database operation
-    if (
-      processedOriginalPrice !== null &&
-      processedOriginalPrice !== undefined
-    ) {
-      // Add detailed logging for debugging
-      console.log("Price validation:", {
-        processedPrice: processedPrice,
-        processedOriginalPrice: processedOriginalPrice,
-        originalPriceType: typeof processedOriginalPrice,
-        priceType: typeof processedPrice,
-        comparison: processedOriginalPrice < processedPrice,
-      });
-
-      if (processedOriginalPrice < processedPrice) {
+      if (
+        processedOriginalPrice !== null &&
+        (isNaN(processedOriginalPrice) || processedOriginalPrice <= 0)
+      ) {
         return res.status(400).json({
           success: false,
-          message: "Original price cannot be less than current price",
-          data: {
-            currentPrice: processedPrice,
-            originalPrice: processedOriginalPrice,
-          },
+          message: "Original price must be a positive whole number",
+          field: "originalPrice",
         });
       }
+    }
+
+    // Validate price relationship
+    if (
+      processedOriginalPrice !== null &&
+      processedOriginalPrice < processedPrice
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Original price must be greater than or equal to current price",
+        data: {
+          currentPrice: processedPrice,
+          originalPrice: processedOriginalPrice,
+        },
+      });
     }
 
     // Prepare update data with proper type conversion
     const updateData = {
       ...req.body,
       ...(req.body.price !== undefined && {
-        price: Math.round(parseFloat(req.body.price)),
+        price: processedPrice,
       }),
       ...(req.body.originalPrice !== undefined && {
-        originalPrice: req.body.originalPrice
-          ? Math.round(parseFloat(req.body.originalPrice))
-          : null,
+        originalPrice: processedOriginalPrice,
       }),
       ...(req.body.inventory !== undefined && {
         inventory: parseInt(req.body.inventory),
@@ -323,7 +329,6 @@ const updateBook = async (req, res) => {
         new: true,
         runValidators: true,
         context: "query",
-        session: req.session, // Include if using transactions
       }
     );
 
@@ -342,24 +347,20 @@ const updateBook = async (req, res) => {
     ) {
       const adjustment = parseInt(req.body.inventory) - existingBook.inventory;
 
-      await Book.findByIdAndUpdate(
-        id,
-        {
-          $push: {
-            inventoryHistory: {
-              date: new Date(),
-              adjustment,
-              newValue: parseInt(req.body.inventory),
-              reason: req.body.inventoryChangeReason || "Admin update",
-              admin: req.user?._id || "system",
-            },
+      await Book.findByIdAndUpdate(id, {
+        $push: {
+          inventoryHistory: {
+            date: new Date(),
+            adjustment,
+            newValue: parseInt(req.body.inventory),
+            reason: req.body.inventoryChangeReason || "Admin update",
+            admin: req.user?._id || "system",
           },
         },
-        { session: req.session }
-      );
+      });
     }
 
-    // Return updated book with populated fields if needed
+    // Return updated book with populated fields
     const result = await Book.findById(updatedBook._id)
       .populate("reviews.user", "name email")
       .populate("category", "name");
@@ -402,11 +403,11 @@ const updateBook = async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Internal server error",
-      ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
+      message: "Internal server error",
+      ...(process.env.NODE_ENV === "development" && {
+        error: error.message,
+        stack: error.stack,
+      }),
     });
   }
 };
