@@ -70,18 +70,18 @@ const bookSchema = new mongoose.Schema(
       type: Number,
       required: [true, "Price is required"],
       min: [0, "Price cannot be negative"],
-      set: (v) => parseFloat(v.toFixed(2)),
+      set: (v) => Math.round(v), // Ensure whole numbers
     },
     originalPrice: {
       type: Number,
       validate: {
         validator: function (value) {
-          // Allow equal prices
           return !value || value >= this.price;
         },
         message:
           "Original price must be greater than or equal to current price",
       },
+      set: (v) => (v ? Math.round(v) : v),
     },
     isbn: {
       type: String,

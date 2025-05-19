@@ -293,10 +293,12 @@ const updateBook = async (req, res) => {
     const updateData = {
       ...req.body,
       ...(req.body.price !== undefined && {
-        price: processedPrice,
+        price: Math.round(parseFloat(req.body.price)),
       }),
       ...(req.body.originalPrice !== undefined && {
-        originalPrice: processedOriginalPrice,
+        originalPrice: req.body.originalPrice
+          ? Math.round(parseFloat(req.body.originalPrice))
+          : null,
       }),
       ...(req.body.inventory !== undefined && {
         inventory: parseInt(req.body.inventory),
