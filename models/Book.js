@@ -74,11 +74,10 @@ const bookSchema = new mongoose.Schema(
     },
     originalPrice: {
       type: Number,
-      min: [0, "Price cannot be negative"],
-      set: (v) => parseFloat(v.toFixed(2)),
       validate: {
-        validator: function (v) {
-          return v === undefined || v >= this.price;
+        validator: function (value) {
+          // Allow equal prices
+          return !value || value >= this.price;
         },
         message:
           "Original price must be greater than or equal to current price",

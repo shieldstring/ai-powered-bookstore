@@ -266,16 +266,27 @@ const updateBook = async (req, res) => {
     // Validate price relationship BEFORE database operation
     if (
       processedOriginalPrice !== null &&
-      processedOriginalPrice < processedPrice
+      processedOriginalPrice !== undefined
     ) {
-      return res.status(400).json({
-        success: false,
-        message: "Original price cannot be less than current price",
-        data: {
-          currentPrice: processedPrice,
-          originalPrice: processedOriginalPrice,
-        },
+      // Add detailed logging for debugging
+      console.log("Price validation:", {
+        processedPrice: processedPrice,
+        processedOriginalPrice: processedOriginalPrice,
+        originalPriceType: typeof processedOriginalPrice,
+        priceType: typeof processedPrice,
+        comparison: processedOriginalPrice < processedPrice,
       });
+
+      if (processedOriginalPrice < processedPrice) {
+        return res.status(400).json({
+          success: false,
+          message: "Original price cannot be less than current price",
+          data: {
+            currentPrice: processedPrice,
+            originalPrice: processedOriginalPrice,
+          },
+        });
+      }
     }
 
     // Prepare update data with proper type conversion
