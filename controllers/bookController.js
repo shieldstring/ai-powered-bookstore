@@ -249,16 +249,43 @@ const updateBook = async (req, res) => {
       return dimensions;
     };
 
+    // Process and validate price fields BEFORE creating updateData
+    let processedPrice = existingBook.price;
+    let processedOriginalPrice = existingBook.originalPrice;
+
+    if (req.body.price !== undefined) {
+      processedPrice = Math.round(parseFloat(req.body.price) * 100) / 100;
+    }
+
+    if (req.body.originalPrice !== undefined) {
+      processedOriginalPrice = req.body.originalPrice
+        ? Math.round(parseFloat(req.body.originalPrice) * 100) / 100
+        : null;
+    }
+
+    // Validate price relationship BEFORE database operation
+    if (
+      processedOriginalPrice !== null &&
+      processedOriginalPrice < processedPrice
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Original price cannot be less than current price",
+        data: {
+          currentPrice: processedPrice,
+          originalPrice: processedOriginalPrice,
+        },
+      });
+    }
+
     // Prepare update data with proper type conversion
     const updateData = {
       ...req.body,
       ...(req.body.price !== undefined && {
-        price: Math.round(parseFloat(req.body.price) * 100) / 100, // Ensure 2 decimal places
+        price: processedPrice,
       }),
       ...(req.body.originalPrice !== undefined && {
-        originalPrice: req.body.originalPrice
-          ? Math.round((parseFloat(req.body.originalPrice) * 100) / 100)
-          : null,
+        originalPrice: processedOriginalPrice,
       }),
       ...(req.body.inventory !== undefined && {
         inventory: parseInt(req.body.inventory),
@@ -274,26 +301,6 @@ const updateBook = async (req, res) => {
 
     // Remove protected fields
     ["_id", "createdAt", "__v"].forEach((field) => delete updateData[field]);
-
-    // Validate price relationship (with tolerance for floating point)
-    if (
-      updateData.price !== undefined &&
-      updateData.originalPrice !== undefined
-    ) {
-      const price = parseFloat(updateData.price);
-      const originalPrice = parseFloat(updateData.originalPrice);
-
-      if (originalPrice < price) {
-        return res.status(400).json({
-          success: false,
-          message: "Original price cannot be less than current price",
-          data: {
-            currentPrice: price,
-            originalPrice: originalPrice,
-          },
-        });
-      }
-    }
 
     // Execute update with conflict detection
     const updatedBook = await Book.findOneAndUpdate(
