@@ -117,84 +117,35 @@ const getBookById = async (req, res) => {
 // Add a new book
 const addBook = async (req, res) => {
   try {
-    // Validate required fields
-    const requiredFields = ['title', 'author', 'price', 'isbn', 'category', 'image'];
-    const missingFields = requiredFields.filter(field => !req.body[field]);
-    
-    if (missingFields.length > 0) {
+    // Basic validation
+    if (!req.body.title || !req.body.author || !req.body.isbn || 
+        !req.body.price || !req.body.category || !req.body.image) {
       return res.status(400).json({
         success: false,
-        message: `Missing required fields: ${missingFields.join(', ')}`
+        message: "Missing required fields"
       });
     }
 
-    // Prepare book data with proper type conversions
-    const bookData = {
-      title: req.body.title.trim(),
-      author: req.body.author.trim(),
-      description: req.body.description?.trim() || '',
-      price: parseFloat(req.body.price),
-      originalPrice: req.body.originalPrice ? parseFloat(req.body.originalPrice) : undefined,
-      isbn: req.body.isbn.replace(/[-\s]/g, ''), // Remove hyphens/spaces from ISBN
-      language: req.body.language || 'English',
-      format: req.body.format || 'Paperback',
-      publishDate: req.body.publishedDate || req.body.publishDate || undefined,
-      publisher: req.body.publisher?.trim(),
-      image: req.body.image,
-      category: req.body.category,
-      inventory: parseInt(req.body.inventory || req.body.stock || 0),
-      pageCount: req.body.pages ? parseInt(req.body.pages) : undefined,
-      dimensions: req.body.dimensions ? {
-        height: parseFloat(req.body.dimensions.split('×')[0].trim()),
-        width: parseFloat(req.body.dimensions.split('×')[1].trim()),
-        thickness: parseFloat(req.body.dimensions.split('×')[2].trim())
-      } : undefined,
-      weight: req.body.weight ? parseFloat(req.body.weight) : undefined,
-      isActive: (parseInt(req.body.inventory || req.body.stock || 0) > 0)
-    };
+    // Create book with automatic validation from model
+    const book = await Book.create(req.body);
 
-    // Validate originalPrice is greater than price if provided
-    if (bookData.originalPrice && bookData.originalPrice < bookData.price) {
-      return res.status(400).json({
-        success: false,
-        message: "Original price must be greater than or equal to current price"
-      });
-    }
-
-    console.log("Creating book with data:", bookData);
-    const book = await Book.create(bookData);
-    console.log("Book created successfully:", book._id);
-
-    return res.status(201).json({
+    // Return simplified response
+    res.status(201).json({
       success: true,
       data: {
         id: book._id,
         title: book.title,
-        author: book.author,
-        price: book.price
+        author: book.author
       }
     });
 
   } catch (error) {
-    console.error("Error creating book:", {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      errors: error.errors
-    });
-
-    // Handle duplicate ISBN error
-    if (error.code === 11000 && error.keyPattern?.isbn) {
-      return res.status(400).json({
-        success: false,
-        message: "A book with this ISBN already exists"
-      });
-    }
-
+    console.error("Error creating book:", error);
+    
     // Handle validation errors
     if (error.name === 'ValidationError') {
       const errors = Object.values(error.errors).map(err => ({
-        field: err.path,
+        path: err.path,
         message: err.message
       }));
       
@@ -205,11 +156,18 @@ const addBook = async (req, res) => {
       });
     }
 
-    // Handle other errors
-    return res.status(500).json({
+    // Handle duplicate ISBN
+    if (error.code === 11000 && error.keyPattern?.isbn) {
+      return res.status(400).json({
+        success: false,
+        message: "A book with this ISBN already exists"
+      });
+    }
+
+    // Generic error
+    res.status(500).json({
       success: false,
-      message: "Internal server error",
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message: "Internal server error"
     });
   }
 };
