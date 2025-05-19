@@ -230,184 +230,122 @@ const updateBook = async (req, res) => {
       });
     }
 
-    // Process dimensions - handle both string and object formats
+    // Process dimensions - accept both object and string formats
     const processDimensions = (dimensions) => {
-      if (!dimensions) return null;
-
-      if (typeof dimensions === "string") {
-        const dimParts = dimensions
-          .split("×")
-          .map((part) => parseFloat(part.trim()));
-        return dimParts.length === 3
-          ? {
-              height: dimParts[0],
-              width: dimParts[1],
-              thickness: dimParts[2],
-            }
-          : null;
+      if (!dimensions) return existingBook.dimensions;
+      
+      if (typeof dimensions === 'string') {
+        const dimParts = dimensions.split('×').map(part => parseFloat(part.trim()));
+        return dimParts.length === 3 ? {
+          height: dimParts[0],
+          width: dimParts[1],
+          thickness: dimParts[2]
+        } : existingBook.dimensions;
       }
       return dimensions;
     };
 
-    // Process and validate price fields (as whole numbers)
-    let processedPrice = existingBook.price;
-    let processedOriginalPrice = existingBook.originalPrice;
-
-    if (req.body.price !== undefined) {
-      processedPrice = Math.round(parseFloat(req.body.price));
-      if (isNaN(processedPrice) || processedPrice <= 0) {
-        return res.status(400).json({
-          success: false,
-          message: "Price must be a positive whole number",
-          field: "price",
-        });
-      }
-    }
-
-    if (req.body.originalPrice !== undefined) {
-      processedOriginalPrice = req.body.originalPrice
-        ? Math.round(parseFloat(req.body.originalPrice))
-        : null;
-
-      if (
-        processedOriginalPrice !== null &&
-        (isNaN(processedOriginalPrice) || processedOriginalPrice <= 0)
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Original price must be a positive whole number",
-          field: "originalPrice",
-        });
-      }
-    }
-
-    // Validate price relationship
-    if (
-      processedOriginalPrice !== null &&
-      processedOriginalPrice < processedPrice
-    ) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Original price must be greater than or equal to current price",
-        data: {
-          currentPrice: processedPrice,
-          originalPrice: processedOriginalPrice,
-        },
-      });
-    }
-
     // Prepare update data with proper type conversion
     const updateData = {
       ...req.body,
-      ...(req.body.price !== undefined && {
-        price: processedPrice,
-      }),
-      ...(req.body.originalPrice !== undefined && {
-        originalPrice: processedOriginalPrice,
-      }),
-      ...(req.body.inventory !== undefined && {
-        inventory: parseInt(req.body.inventory),
-        isActive: parseInt(req.body.inventory) > 0,
-      }),
-      dimensions:
-        processDimensions(req.body.dimensions) || existingBook.dimensions,
-      ...(req.body.publishedDate && {
-        publishedDate: new Date(req.body.publishedDate),
+      // Convert prices to numbers (handles both string and number inputs)
+      price: Number(req.body.price),
+      originalPrice: req.body.originalPrice ? Number(req.body.originalPrice) : undefined,
+      inventory: parseInt(req.body.inventory),
+      dimensions: processDimensions(req.body.dimensions),
+      ...(req.body.publishDate && {
+        publishDate: new Date(req.body.publishDate)
       }),
       updatedAt: new Date(),
+      isActive: req.body.inventory > 0
     };
 
     // Remove protected fields
-    ["_id", "createdAt", "__v"].forEach((field) => delete updateData[field]);
+    delete updateData._id;
+    delete updateData.createdAt;
+    delete updateData.__v;
 
-    // Execute update with conflict detection
-    const updatedBook = await Book.findOneAndUpdate(
-      { _id: id, __v: existingBook.__v }, // Optimistic concurrency control
+    // Validate price relationship (with tolerance for floating point)
+    if (updateData.originalPrice !== undefined && updateData.originalPrice < updateData.price) {
+      return res.status(400).json({
+        success: false,
+        message: "Original price must be greater than or equal to current price",
+        data: {
+          currentPrice: updateData.price,
+          originalPrice: updateData.originalPrice
+        }
+      });
+    }
+
+    // Execute update
+    const updatedBook = await Book.findByIdAndUpdate(
+      id,
       updateData,
       {
         new: true,
         runValidators: true,
-        context: "query",
+        context: 'query'
       }
     );
 
     if (!updatedBook) {
-      return res.status(409).json({
+      return res.status(404).json({
         success: false,
-        message:
-          "Book was modified by another process. Please refresh and try again.",
+        message: "Book not found after update attempt",
       });
     }
 
     // Track inventory changes if modified
-    if (
-      req.body.inventory !== undefined &&
-      parseInt(req.body.inventory) !== existingBook.inventory
-    ) {
+    if (req.body.inventory !== undefined && 
+        parseInt(req.body.inventory) !== existingBook.inventory) {
       const adjustment = parseInt(req.body.inventory) - existingBook.inventory;
-
+      
       await Book.findByIdAndUpdate(id, {
         $push: {
           inventoryHistory: {
             date: new Date(),
             adjustment,
             newValue: parseInt(req.body.inventory),
-            reason: req.body.inventoryChangeReason || "Admin update",
-            admin: req.user?._id || "system",
-          },
-        },
+            reason: "Admin update",
+            admin: req.user?._id || "system"
+          }
+        }
       });
     }
-
-    // Return updated book with populated fields
-    const result = await Book.findById(updatedBook._id)
-      .populate("reviews.user", "name email")
-      .populate("category", "name");
 
     res.json({
       success: true,
       message: "Book updated successfully",
-      data: result,
+      data: updatedBook
     });
+
   } catch (error) {
-    console.error("Update error:", error);
+    console.error("Error updating book:", error);
 
-    // Handle specific error cases
-    if (error.name === "ValidationError") {
-      const errors = Object.entries(error.errors).reduce(
-        (acc, [field, { message }]) => {
-          acc[field === "publishDate" ? "publishedDate" : field] = message;
-          return acc;
-        },
-        {}
-      );
-
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      const errors = {};
+      Object.keys(error.errors).forEach(key => {
+        errors[key] = error.errors[key].message;
+      });
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors,
+        errors
       });
     }
 
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      return res.status(409).json({
+    // Handle duplicate ISBN
+    if (error.code === 11000 && error.keyPattern?.isbn) {
+      return res.status(400).json({
         success: false,
-        message: `${
-          field.charAt(0).toUpperCase() + field.slice(1)
-        } already exists`,
-        field,
+        message: "A book with this ISBN already exists"
       });
     }
 
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      ...(process.env.NODE_ENV === "development" && {
-        error: error.message,
-        stack: error.stack,
-      }),
+      message: "Internal server error while updating book"
     });
   }
 };
