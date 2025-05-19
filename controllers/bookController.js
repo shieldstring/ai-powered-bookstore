@@ -283,11 +283,10 @@ const updateBook = async (req, res) => {
       const price = parseFloat(updateData.price);
       const originalPrice = parseFloat(updateData.originalPrice);
 
-      if (originalPrice < price && Math.abs(originalPrice - price) > 0.001) {
+      if (originalPrice < price) {
         return res.status(400).json({
           success: false,
-          message:
-            "Original price must be greater than or equal to current price",
+          message: "Original price cannot be less than current price",
           data: {
             currentPrice: price,
             originalPrice: originalPrice,
