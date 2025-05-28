@@ -100,7 +100,32 @@ const userSchema = mongoose.Schema(
       type: notificationPreferencesSchema,
       default: () => ({}),
     },
+
+    // Social features fields
+ following: [
+      {
+ type: mongoose.Schema.Types.ObjectId,
+ ref: "User",
+      },
+ ],
+ followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+
   },
+ // Privacy settings
+ isPublic: {
+ type: Boolean,
+ default: true,
+ },
+ blockedUsers: [
+ {
+ type: mongoose.Schema.Types.ObjectId,
+ ref: "User",
+ },
+ ],
+ reports: [
+ { reportedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, reason: String },
+ ],
+ },
   { timestamps: true }
 );
 

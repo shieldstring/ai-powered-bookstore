@@ -397,6 +397,18 @@ const addDiscussion = async (req, res) => {
 const getDiscussions = async (req, res) => {
   const { groupId } = req.params;
   try {
+    // Find the group to check membership
+    const group = await Group.findById(groupId);
+
+    if (!group) {
+      return res.status(404).json({ message: "Group not found" });
+    }
+
+    // Check if the requesting user is a member of the group
+    if (!group.members.some(member => member.toString() === req.user._id.toString())) {
+      return res.status(403).json({ message: "You are not a member of this group" });
+    }
+
     const discussions = await Discussion.find({ group: groupId })
       .populate("user", "name")
       .populate("likes", "name")

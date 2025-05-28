@@ -5,7 +5,10 @@ const Group = require("../models/Group");
 const getUserProfile = async (req, res) => {
   try {
     // Get user details excluding password
-    const user = await User.findById(req.user._id).select("-password");
+    const user = await User.findById(req.user._id)
+      .select("-password")
+      .populate("following", "_id name profilePicture") // Populate following users
+      .populate("followers", "_id name profilePicture"); // Populate followers
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -20,6 +23,8 @@ const getUserProfile = async (req, res) => {
     const response = {
       ...user.toObject(),
       groups: userGroups,
+      followingCount: user.following.length, // Add following count
+      followersCount: user.followers.length, // Add followers count
     };
 
     res.json(response);
@@ -33,17 +38,30 @@ const getUserProfile = async (req, res) => {
 const updateProfile = async (req, res) => {
   const { name, bio, profilePicture, phone } = req.body;
   try {
+    // Ensure the user is updating their own profile
+    // Check if the user is authenticated (assuming auth middleware is used)
+    if (!req.user) {
+ return res.status(401).json({ message: "Not authenticated" });
+    }
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.name = name || user.name;
+    // Update basic profile fields
+ user.name = name || user.name;
     user.bio = bio || user.bio;
     user.profilePicture = profilePicture || user.profilePicture;
+
     user.phone = phone || user.phone;
 
     await user.save();
+    // Update isPublic if provided and is a boolean
+    if (req.body.hasOwnProperty('isPublic')) {
+      if (typeof req.body.isPublic === 'boolean') {
+        user.isPublic = req.body.isPublic;
+      }
+    }
     res.json(user);
   } catch (error) {
     res.status(500).json({ message: "Server error" });
@@ -64,10 +82,26 @@ const getAllUsers = async (req, res) => {
 const getUserById = async (req, res) => {
   const { id } = req.params;
   try {
-    const user = await User.findById(id).select("-password");
+    const user = await User.findById(id)
+      .select("-password")
+      .populate("following", "_id name profilePicture") // Populate following users
+      .populate("followers", "_id name profilePicture"); // Populate followers
+
+    // Check if the requesting user is blocked by the target user
+    if (user.blockedUsers.includes(req.user._id)) {
+      return res.status(403).json({ message: "You are blocked by this user." });
+    }
 
     if (!user) {
       return res.status(404).json({ message: "User not found" });
+    }
+
+    // Check privacy settings
+    if (!user.isPublic) {
+      // If private, check if the requesting user is a follower
+      if (!user.followers.some(follower => follower._id.equals(req.user._id))) {
+        return res.status(403).json({ message: "This profile is private." });
+      }
     }
 
     // Find all groups where user is a member
@@ -79,6 +113,8 @@ const getUserById = async (req, res) => {
     const response = {
       ...user.toObject(),
       groups: userGroups,
+      followingCount: user.following.length, // Add following count
+      followersCount: user.followers.length, // Add followers count
     };
 
     res.json(response);

@@ -15,12 +15,19 @@ const search = async (req, res) => {
       ],
     });
 
-    const users = await User.find({
+    // Build the query for users, considering privacy settings
+    const userQuery = {
       $or: [
         { name: { $regex: query, $options: 'i' } },
         { email: { $regex: query, $options: 'i' } },
       ],
-    });
+      // Add privacy filter: public OR (private AND is a follower)
+      $or: [
+        { isPublic: true },
+        { followers: req.user._id } // Assuming req.user._id is available from authentication middleware
+      ]
+    };
+    const users = await User.find(userQuery);
 
     const groups = await Group.find({
       $or: [
