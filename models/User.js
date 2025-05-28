@@ -110,23 +110,34 @@ const userSchema = mongoose.Schema(
  ],
  followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
-  },
  // Privacy settings
  isPublic: {
- type: Boolean,
- default: true,
- },
- blockedUsers: [
- {
- type: mongoose.Schema.Types.ObjectId,
- ref: "User",
- },
- ],
- reports: [
- { reportedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, reason: String },
- ],
- },
-  { timestamps: true }
+  type: Boolean,
+  default: true,
+  },
+  blockedUsers: [
+  {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  },
+  ],
+  reports: [
+  { reportedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, reason: String },
+  ],
+    // Moderation fields
+ warningCount: {
+  type: Number,
+  default: 0,
+  },
+  isSuspended: {
+  type: Boolean,
+  default: false,
+  },
+  suspensionEndDate: {
+  type: Date,
+ 
+  },
+  }
 );
 
 // Generate a unique referral code before saving if one doesn't exist

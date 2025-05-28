@@ -82,19 +82,31 @@ const getPostById = async (req, res) => {
 const getPosts = async (req, res) => {
   try {
     // Basic pagination/fetching for now - can be expanded later
-    const limit = parseInt(req.query.limit) || 10;
+    const requestedLimit = parseInt(req.query.limit) || 10;
+    // Fetch more posts initially to allow for sorting by engagement
+    const fetchLimit = requestedLimit * 2; // Fetch double the requested limit, adjust as needed
     const skip = parseInt(req.query.skip) || 0;
 
-    const posts = await Post.find()
- .sort({
-        createdAt: -1
-      }) // Get newest posts first
- .limit(limit)
+    // Get the IDs of users the current user is following
+    const followedUsers = req.user.following;
+
+    const posts = await Post.find({ isHidden: false, user: { $in: followedUsers } }) // Filter out hidden posts and show posts from followed users
+ .sort({ createdAt: -1 }) // Get newest posts first (initial sort)
+ .limit(fetchLimit) // Fetch more posts
  .skip(skip)
  .populate('user', 'name avatar')
  .populate('comments.user', 'name avatar');
 
-    res.json(posts);
+    // Calculate engagement score and sort
+    const sortedPosts = posts.sort((a, b) => {
+      const engagementA = a.likes.length + a.comments.length;
+      const engagementB = b.likes.length + b.comments.length;
+      // Sort by engagement (descending) then recency (descending)
+      return engagementB - engagementA || b.createdAt - a.createdAt;
+    });
+
+    // Return only the requested number of posts
+    res.json(sortedPosts.slice(0, requestedLimit));
   } catch (error) {
     console.error('Error fetching posts:', error);
     res.status(500).json({

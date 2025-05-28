@@ -8,7 +8,7 @@ const ReportSchema = new mongoose.Schema({
   },
   reportType: {
     type: String,
-    enum: ['post', 'comment', 'user'],
+    enum: ['post', 'comment', 'user', 'spam', 'hate speech', 'nudity', 'harassment'],
     required: true,
   },
   reportedContent: {
@@ -28,6 +28,13 @@ const ReportSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now,
+  },
+  reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  resolution: {
+    type: String,
   },
 });
 

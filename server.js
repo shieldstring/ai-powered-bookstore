@@ -8,6 +8,8 @@ const cors = require("cors");
 const passport = require("passport");
 const session = require("express-session");
 const cookieParser = require("cookie-parser");
+const Message = require("./models/Message");
+const Conversation = require("./models/Conversation");
 
 // Load environment variables
 dotenv.config();
@@ -102,26 +104,81 @@ app.use("/api/notifications", notificationRoutes);
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
 
-  // Join a group chat room
-  socket.on("joinGroup", (groupId) => {
-    socket.join(groupId);
-    console.log(`User ${socket.id} joined group ${groupId}`);
+  // Join a conversation room
+  socket.on("joinConversation", (conversationId) => {
+    socket.join(conversationId);
+    console.log(`User ${socket.id} joined conversation ${conversationId}`);
   });
 
-  // Send a message to a group
-  socket.on("sendGroupMessage", ({ groupId, message }) => {
-    io.to(groupId).emit("receiveGroupMessage", { userId: socket.id, message });
+  // Typing indicator in a conversation
+  socket.on("typingInConversation", (conversationId) => {
+    // Assuming socket.userId is attached during authentication
+    if (socket.userId) {
+      socket.to(conversationId).emit("userTypingInConversation", { conversationId, userId: socket.userId });
+    }
   });
 
-  // Typing indicator in a group
-  socket.on("typingInGroup", (groupId) => {
-    socket.to(groupId).emit("userTyping", { userId: socket.id });
+  // Stop typing indicator in a conversation
+  socket.on("stopTypingInConversation", (conversationId) => {
+    // Assuming socket.userId is attached during authentication
+    if (socket.userId) {
+      socket.to(conversationId).emit("userStopTypingInConversation", { conversationId, userId: socket.userId });
+    }
   });
 
+  // Handle messages read
+  socket.on("messagesRead", async ({ conversationId, messageIds }) => {
+    // Assuming socket.userId is attached during authentication
+    if (!socket.userId) {
+ return; // Or handle unauthorized access
+    }
+
+    try {
+      // Find messages by IDs and conversation ID and update their readBy array
+      await Message.updateMany(
+        { _id: { $in: messageIds }, conversation: conversationId },
+        { $addToSet: { readBy: socket.userId } } // Use $addToSet to avoid duplicates
+      );
+
+      // Emit a messagesRead event to other participants in the conversation
+      socket.to(conversationId).emit("messagesRead", { conversationId, userId: socket.userId, messageIds });
+      console.log(`User ${socket.userId} read messages ${messageIds} in conversation ${conversationId}`);
+    } catch (error) {
+      console.error("Error handling messages read:", error);
+      // Optionally, emit an error event back to the sender
+    }
+  });
+
+  // Leave a conversation/group chat
+  socket.on("leaveConversation", async (conversationId) => {
+    // Assuming socket.userId is attached during authentication
+    if (!socket.userId) {
+      return; // Or handle unauthorized access
+    }
+
+    try {
+      // Remove the user from the conversation participants
+      const conversation = await Conversation.findByIdAndUpdate(
+        conversationId,
+        { $pull: { participants: socket.userId } },
+        { new: true } // Return the updated conversation
+      );
+
+      socket.leave(conversationId); // Have the socket leave the Socket.IO room
+      socket.to(conversationId).emit("userLeftConversation", { conversationId, userId: socket.userId });
+      console.log(`User ${socket.userId} left conversation ${conversationId}`);
+    } catch (error) {
+      console.error("Error handling leave conversation:", error);
+      // Optionally, emit an error event back to the sender
+    }
+  });
   // Presence tracking
   socket.on("userOnline", (userId) => {
     io.emit("userStatus", { userId, status: "online" });
   });
+
+  // Note: Private message sending/receiving logic (sendPrivateMessage)
+  // needs to be re-added and updated to use Conversation and Message models.
 
   socket.on("disconnect", () => {
     console.log("A user disconnected:", socket.id);

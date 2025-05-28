@@ -49,6 +49,10 @@ const PostSchema = new Schema({
       },
     },
   ],
+  isHidden: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 // Update `updatedAt` field on save

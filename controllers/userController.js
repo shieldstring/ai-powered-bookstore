@@ -156,6 +156,52 @@ const deleteUser = async (req, res) => {
   }
 };
 
+// Warn a user (Admin/Moderator only)
+const warnUser = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    user.warningCount = (user.warningCount || 0) + 1;
+    await user.save();
+    res.json(user);
+  } catch (error) {
+    console.error("Error warning user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Suspend a user (Admin/Moderator only)
+const suspendUser = async (req, res) => {
+  const { id } = req.params;
+  const { durationInDays } = req.body; // Duration of suspension in days
+  try {
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (typeof durationInDays !== 'number' || durationInDays <= 0) {
+       return res.status(400).json({ message: "Valid suspension duration in days is required" });
+    }
+
+    const suspensionEndDate = new Date();
+    suspensionEndDate.setDate(suspensionEndDate.getDate() + durationInDays);
+
+    user.isSuspended = true;
+    user.suspensionEndDate = suspensionEndDate;
+    await user.save();
+
+    res.json(user);
+  } catch (error) {
+    console.error("Error suspending user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 // Register/update FCM token for push notifications
 const updateFcmToken = async (req, res) => {
   try {
@@ -247,4 +293,6 @@ module.exports = {
   updateFcmToken,
   removeFcmToken,
   getFcmTokens,
+  warnUser,
+  suspendUser,
 };

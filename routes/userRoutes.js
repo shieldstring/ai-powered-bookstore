@@ -8,6 +8,8 @@ const {
   updateUserRole,
   deleteUser,
   updateFcmToken,
+  warnUser,
+  suspendUser,
   removeFcmToken,
   getFcmTokens,
 } = require("../controllers/userController");
@@ -25,6 +27,9 @@ router.get("/", protect, admin, getAllUsers); // Get all users (admin only)
 router.get("/:id", protect, admin, getUserById); // Get a single user by ID (admin only)
 router.put("/:id/role", protect, admin, updateUserRole); // Update a user's role (admin only)
 router.delete("/:id", protect, admin, deleteUser); // Delete a user (admin only)
+// Moderator actions on users (Admin/Moderator access only)
+router.put("/:id/warn", protect, admin, warnUser); // Warn a user
+router.put("/:id/suspend", protect, admin, suspendUser); // Suspend a user
 
 // Notification routes
 router.post("/fcm-tokens", protect, updateFcmToken);

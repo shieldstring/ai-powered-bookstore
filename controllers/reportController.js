@@ -1,5 +1,6 @@
 const Report = require('../models/Report');
 const Post = require('../models/Post'); // Import Post model
+const User = require('../models/User'); // Import User model
 
 const createReport = async (req, res) => {
   try {
@@ -162,10 +163,49 @@ const deleteComment = async (req, res) => {
   }
 };
 
+// Resolve a report and record resolution (Admin/Moderator only)
+const resolveReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { resolution } = req.body;
+    const moderatorId = req.user._id; // Assuming authenticated moderator's ID
+
+    if (!resolution) {
+      return res.status(400).json({
+        message: 'Resolution description is required'
+      });
+    }
+
+    const report = await Report.findById(id);
+
+    if (!report) {
+      return res.status(404).json({
+        message: 'Report not found'
+      });
+    }
+
+    report.status = 'resolved';
+    report.reviewedBy = moderatorId;
+    report.resolution = resolution;
+    await report.save();
+
+    // Optionally populate reviewedBy user details before sending response
+    const populatedReport = await Report.findById(report._id).populate('reviewedBy', 'name avatar');
+
+    res.json(populatedReport);
+  } catch (error) {
+    console.error('Error resolving report:', error);
+    res.status(500).json({
+      message: 'Server error'
+    });
+  }
+};
+
 module.exports = {
   createReport,
   getReports,
   updateReportStatus,
   hidePost,
   deleteComment,
+  resolveReport,
 };
