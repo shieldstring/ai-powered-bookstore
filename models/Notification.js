@@ -12,20 +12,10 @@ const notificationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     },
-    type: {
+    type: { 
       type: String,
       required: true,
-      enum: [
-        "groupInvite", 
-        "newDiscussion", 
-        "commentMention", 
-        "discussionLike", 
-        "discussionComment",
-        "groupActivity",
-        "system",
-        "other"
-      ]
-    },
+    }, // e.g., "newMessage", "newLike", "newFollower"
     read: {
       type: Boolean,
       default: false,
@@ -35,25 +25,12 @@ const notificationSchema = new mongoose.Schema(
       type: Date
     },
     message: {
-      type: String,
+      type: String, // This field is not in the new schema, removing it
+      required: true // This field is not in the new schema, removing it
+    }, // This field is not in the new schema, removing it
+    entityId: {
+      type: mongoose.Schema.Types.ObjectId,
       required: true
-    },
-    // Reference to relevant entities
-    group: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Group"
-    },
-    discussion: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Discussion"
-    },
-    comment: {
-      type: mongoose.Schema.Types.ObjectId
-    },
-    // Additional data as needed
-    data: {
-      type: Object,
-      default: {}
     }
   },
   {
@@ -61,11 +38,11 @@ const notificationSchema = new mongoose.Schema(
   }
 );
 
-// Index for efficient queries
+// Index for efficient queries (Keeping relevant indexes, removing those tied to removed fields)
 notificationSchema.index({ recipient: 1, createdAt: -1 });
 notificationSchema.index({ recipient: 1, read: 1 });
 
-// Create a TTL index to automatically delete old notifications after 30 days
+// Create a TTL index to automatically delete old notifications after 30 days (Keeping this)
 notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 
 const Notification = mongoose.model("Notification", notificationSchema);

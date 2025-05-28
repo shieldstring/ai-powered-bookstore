@@ -1,6 +1,53 @@
 const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const User = require('../models/User'); // Assuming User model is needed for population
+const Notification = require('../models/Notification'); // Assuming Notification model exists
+const admin = require('../firebase'); // Import firebase admin
+
+// Helper function to send a push notification
+const sendPushNotification = async (userId, message, data = {}) => {
+  const user = await User.findById(userId);
+  if (user && user.fcmToken) {
+    await admin.messaging().send({
+      token: user.fcmToken,
+      notification: {
+        body: message,
+      },
+      data: data,
+    });
+  }
+};
+
+// Helper function to create a database notification
+const createNotification = async (
+  recipientId,
+  senderId,
+  type,
+  message,
+  data = {}
+) => {
+  try {
+    // Create notification in database
+    const notification = await Notification.create({
+      recipient: recipientId,
+      sender: senderId,
+      type,
+      message,
+      ...data,
+      isRead: false, // Use isRead as per Notification model
+    });
+
+    // Increment notification count for recipient
+    await User.findByIdAndUpdate(recipientId, {
+      $inc: { notificationCount: 1 },
+    });
+
+    return notification;
+  } catch (error) {
+    console.error("Error creating database notification:", error);
+    return null;
+  }
+};
 
 // Send a private message
 const sendMessage = async (req, res) => {
@@ -31,11 +78,45 @@ const sendMessage = async (req, res) => {
     conversation.lastMessage = message._id;
     await conversation.save();
 
+    // Get sender's name for notification message
+    const senderUser = await User.findById(senderId).select('name');
+    const senderName = senderUser ? senderUser.name : 'Someone';
+
+    // Prepare notification message
+    const notificationMessage = `${senderName} sent you a message: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`;
+
+    // Generate notifications for participants (excluding the sender)
+    const recipientIds = conversation.participants.filter(
+      (participantId) => participantId.toString() !== senderId.toString()
+    );
+
+    // Create database notifications and send push notifications
+    for (const recipientId of recipientIds) {
+      // Create database notification
+      await createNotification(
+        recipientId,
+        senderId,
+        'newMessage',
+        notificationMessage,
+        { conversation: conversationId, message: message._id } // Add relevant data
+      );
+
+      // Send push notification
+      await sendPushNotification(recipientId, notificationMessage, {
+        title: 'New Message',
+        type: 'newMessage',
+        data: {
+          conversationId: conversationId.toString(),
+          messageId: message._id.toString(),
+        },
+      });
+    }
+
     res.status(201).json(message);
   } catch (error) {
     console.error('Error sending message:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
+      console.error('Error generating notifications:', notificationError);
+    }
 };
 
 // Get conversations for the logged-in user

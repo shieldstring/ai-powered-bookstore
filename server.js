@@ -10,6 +10,7 @@ const session = require("express-session");
 const cookieParser = require("cookie-parser");
 const Message = require("./models/Message");
 const Conversation = require("./models/Conversation");
+const { sendMessage } = require("./controllers/messageController");
 
 // Load environment variables
 dotenv.config();
