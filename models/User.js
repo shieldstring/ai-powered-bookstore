@@ -102,41 +102,48 @@ const userSchema = mongoose.Schema(
     },
 
     // Social features fields
- following: [
+    following: [
       {
- type: mongoose.Schema.Types.ObjectId,
- ref: "User",
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
       },
- ],
- followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+    ],
+    followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
 
- // Privacy settings
- isPublic: {
-  type: Boolean,
-  default: true,
-  },
-  blockedUsers: [
-  {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "User",
-  },
-  ],
-  reports: [
-  { reportedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, reason: String },
-  ],
+    // Privacy settings
+    isPublic: {
+      type: Boolean,
+      default: true,
+    },
+    blockedUsers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    reports: [
+      { 
+        reportedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, 
+        reason: String,
+        createdAt: { type: Date, default: Date.now } // Added timestamp for reports
+      },
+    ],
+    
     // Moderation fields
- warningCount: {
-  type: Number,
-  default: 0,
+    warningCount: {
+      type: Number,
+      default: 0,
+    },
+    isSuspended: {
+      type: Boolean,
+      default: false,
+    },
+    suspensionEndDate: {
+      type: Date,
+    },
   },
-  isSuspended: {
-  type: Boolean,
-  default: false,
-  },
-  suspensionEndDate: {
-  type: Date,
- 
-  },
+  {
+    timestamps: true, // Adds createdAt and updatedAt automatically
   }
 );
 
@@ -144,13 +151,27 @@ const userSchema = mongoose.Schema(
 userSchema.pre("save", async function (next) {
   // Generate referral code if it doesn't exist
   if (!this.referralCode) {
-    // Use email and timestamp for uniqueness
-    const seed = this.email + Date.now();
-    this.referralCode = crypto
-      .createHash("md5")
-      .update(seed)
-      .digest("hex")
-      .substring(0, 8);
+    let isUnique = false;
+    let code;
+    
+    // Keep generating until we find a unique code
+    while (!isUnique) {
+      // Use email and timestamp for uniqueness
+      const seed = this.email + Date.now() + Math.random();
+      code = crypto
+        .createHash("md5")
+        .update(seed)
+        .digest("hex")
+        .substring(0, 8);
+      
+      // Check if code already exists
+      const existingUser = await mongoose.model("User").findOne({ referralCode: code });
+      if (!existingUser) {
+        isUnique = true;
+      }
+    }
+    
+    this.referralCode = code;
   }
   next();
 });
@@ -173,8 +194,10 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 
 // Add indexes for frequently queried fields
 userSchema.index({ name: 1 });
-userSchema.index({ referralCode: 1 }, { unique: true, sparse: true }); // Define uniqueness and sparseness here
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ referralCode: 1 }, { unique: true, sparse: true });
 userSchema.index({ referredBy: 1 });
+userSchema.index({ createdAt: -1 });
 
 // Method to add/update FCM token
 userSchema.methods.addFcmToken = async function (
@@ -260,6 +283,69 @@ userSchema.methods.getReferrals = async function (limit = 10, skip = 0) {
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(limit);
+};
+
+// Method to follow another user
+userSchema.methods.followUser = async function (userIdToFollow) {
+  if (this._id.toString() === userIdToFollow.toString()) {
+    throw new Error("Cannot follow yourself");
+  }
+  
+  if (!this.following.includes(userIdToFollow)) {
+    this.following.push(userIdToFollow);
+    await this.save();
+    
+    // Add this user to the other user's followers
+    const userToFollow = await mongoose.model("User").findById(userIdToFollow);
+    if (userToFollow && !userToFollow.followers.includes(this._id)) {
+      userToFollow.followers.push(this._id);
+      await userToFollow.save();
+    }
+  }
+  return this;
+};
+
+// Method to unfollow another user
+userSchema.methods.unfollowUser = async function (userIdToUnfollow) {
+  this.following = this.following.filter(id => id.toString() !== userIdToUnfollow.toString());
+  await this.save();
+  
+  // Remove this user from the other user's followers
+  const userToUnfollow = await mongoose.model("User").findById(userIdToUnfollow);
+  if (userToUnfollow) {
+    userToUnfollow.followers = userToUnfollow.followers.filter(id => id.toString() !== this._id.toString());
+    await userToUnfollow.save();
+  }
+  
+  return this;
+};
+
+// Method to block a user
+userSchema.methods.blockUser = async function (userIdToBlock) {
+  if (this._id.toString() === userIdToBlock.toString()) {
+    throw new Error("Cannot block yourself");
+  }
+  
+  if (!this.blockedUsers.includes(userIdToBlock)) {
+    this.blockedUsers.push(userIdToBlock);
+    // Remove from following/followers when blocking
+    this.following = this.following.filter(id => id.toString() !== userIdToBlock.toString());
+    this.followers = this.followers.filter(id => id.toString() !== userIdToBlock.toString());
+    await this.save();
+  }
+  return this;
+};
+
+// Method to unblock a user
+userSchema.methods.unblockUser = async function (userIdToUnblock) {
+  this.blockedUsers = this.blockedUsers.filter(id => id.toString() !== userIdToUnblock.toString());
+  await this.save();
+  return this;
+};
+
+// Method to check if user is blocked
+userSchema.methods.isBlocked = function (userId) {
+  return this.blockedUsers.some(id => id.toString() === userId.toString());
 };
 
 module.exports = mongoose.model("User", userSchema);
