@@ -28,7 +28,7 @@ const createPost = async (req, res) => {
 
     // Extract hashtags and mentions from text content
     if (content.text) {
-      const { hashtags, mentions } = extractHashtagsAndMentags(content.text);
+      const { hashtags, mentions } = extractHashtagsAndMentions(content.text); // Fixed typo: was "extractHashtagsAndMentags"
       console.log('Extracted from post:', { hashtags, mentions });
     }
 
@@ -61,12 +61,12 @@ const createPost = async (req, res) => {
 const getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
- .populate('user', 'name avatar') // Populate user who created the post
- .populate('comments.user', 'name avatar'); // Populate user for each comment
+      .populate('user', 'name avatar') // Populate user who created the post
+      .populate('comments.user', 'name avatar'); // Populate user for each comment
 
     if (!post) {
       return res.status(404).json({
- message: 'Post not found'
+        message: 'Post not found'
       });
     }
 
@@ -74,7 +74,7 @@ const getPostById = async (req, res) => {
   } catch (error) {
     console.error('Error fetching post by ID:', error);
     res.status(500).json({
- message: 'Server error'
+      message: 'Server error'
     });
   }
 };
@@ -88,14 +88,17 @@ const getPosts = async (req, res) => {
     const skip = parseInt(req.query.skip) || 0;
 
     // Get the IDs of users the current user is following
-    const followedUsers = req.user.following;
+    const followedUsers = req.user.following || []; // Added fallback for empty following array
 
-    const posts = await Post.find({ isHidden: false, user: { $in: followedUsers } }) // Filter out hidden posts and show posts from followed users
- .sort({ createdAt: -1 }) // Get newest posts first (initial sort)
- .limit(fetchLimit) // Fetch more posts
- .skip(skip)
- .populate('user', 'name avatar')
- .populate('comments.user', 'name avatar');
+    const posts = await Post.find({ 
+      isHidden: false, 
+      user: { $in: [...followedUsers, req.user._id] } // Include user's own posts
+    })
+      .sort({ createdAt: -1 }) // Get newest posts first (initial sort)
+      .limit(fetchLimit) // Fetch more posts
+      .skip(skip)
+      .populate('user', 'name avatar')
+      .populate('comments.user', 'name avatar');
 
     // Calculate engagement score and sort
     const sortedPosts = posts.sort((a, b) => {
@@ -110,7 +113,7 @@ const getPosts = async (req, res) => {
   } catch (error) {
     console.error('Error fetching posts:', error);
     res.status(500).json({
- message: 'Server error'
+      message: 'Server error'
     });
   }
 };
@@ -177,7 +180,6 @@ const addCommentToPost = async (req, res) => {
     const { hashtags, mentions } = extractHashtagsAndMentions(text);
     console.log('Extracted from comment:', { hashtags, mentions });
 
-
     const newComment = {
       user: userId,
       text,
@@ -204,12 +206,12 @@ const addCommentToPost = async (req, res) => {
 const deleteCommentFromPost = async (req, res) => {
   try {
     const {
-      id,
+      postId, // Changed from 'id' to 'postId' to match route parameter
       commentId
     } = req.params;
     const userId = req.user._id;
 
-    const post = await Post.findById(id);
+    const post = await Post.findById(postId); // Changed from 'id' to 'postId'
 
     if (!post) {
       return res.status(404).json({
@@ -252,7 +254,6 @@ const deleteCommentFromPost = async (req, res) => {
     });
   }
 };
-
 
 module.exports = {
   createPost,
