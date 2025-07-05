@@ -1,24 +1,33 @@
 const express = require('express');
-const { createPost, getPostById, getPosts, likeUnlikePost, addCommentToPost, deleteCommentFromPost } = require('../controllers/postController');
+const {
+  createPost,
+  getPostById,
+  getPosts,
+  likeUnlikePost,
+  addCommentToPost,
+  deleteCommentFromPost,
+} = require('../controllers/postController');
+
+const { protect } = require('../middleware/auth'); // 🛡️ Import your middleware
 
 const router = express.Router();
 
-// POST /api/posts
-router.post('/', createPost);
+// Protected: Create post
+router.post('/', protect, createPost);
 
-// GET /api/posts/:id
+// Public: Get post by ID
 router.get('/:id', getPostById);
 
-// GET /api/posts
-router.get('/', getPosts);
+// Protected: Get feed/posts
+router.get('/', protect, getPosts);
 
-// PUT /api/posts/:id/like (or POST, PUT is common for updates)
-router.put('/:id/like', likeUnlikePost);
+// Protected: Like/unlike post
+router.put('/:id/like', protect, likeUnlikePost);
 
-// POST /api/posts/:id/comments
-router.post('/:id/comments', addCommentToPost);
+// Protected: Add comment
+router.post('/:id/comments', protect, addCommentToPost);
 
-// DELETE /api/posts/:postId/comments/:commentId
-router.delete('/:postId/comments/:commentId', deleteCommentFromPost);
+// Protected: Delete comment
+router.delete('/:postId/comments/:commentId', protect, deleteCommentFromPost);
 
 module.exports = router;
