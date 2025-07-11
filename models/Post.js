@@ -1,10 +1,10 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
 const PostSchema = new Schema({
   user: {
     type: Schema.Types.ObjectId,
-    ref: 'User',
+    ref: "User",
     required: true,
   },
   content: {
@@ -29,24 +29,22 @@ const PostSchema = new Schema({
   likes: [
     {
       type: Schema.Types.ObjectId,
-      ref: 'User',
+      ref: "User",
     },
   ],
   comments: [
     {
-      user: {
-        type: Schema.Types.ObjectId,
-        ref: 'User',
-        required: true,
-      },
-      text: {
-        type: String,
-        required: true,
-      },
-      createdAt: {
-        type: Date,
-        default: Date.now,
-      },
+      user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      text: String,
+      createdAt: { type: Date, default: Date.now },
+      likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
+      replies: [
+        {
+          user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+          text: String,
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
     },
   ],
   isHidden: {
@@ -56,9 +54,9 @@ const PostSchema = new Schema({
 });
 
 // Update `updatedAt` field on save
-PostSchema.pre('save', function(next) {
+PostSchema.pre("save", function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
-module.exports = mongoose.model('Post', PostSchema);
+module.exports = mongoose.model("Post", PostSchema);
