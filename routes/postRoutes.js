@@ -7,8 +7,9 @@ const {
   addCommentToPost,
   deleteCommentFromPost,
 } = require('../controllers/postController');
+const { protect } = require('../middleware/authMiddleware');
 
-const { protect } = require('../middleware/auth'); // 🛡️ Import your middleware
+
 
 const router = express.Router();
 
