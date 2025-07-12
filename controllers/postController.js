@@ -501,13 +501,23 @@ const getSavedPosts = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).populate({
       path: "savedPosts",
-      populate: { path: "user", select: "name profilePicture" },
+      populate: {
+        path: "user",
+        select: "name profilePicture",
+      },
     });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     res.status(200).json(user.savedPosts);
   } catch (error) {
-    console.error("Error fetching saved posts:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Error fetching saved posts:", {
+      message: error.message,
+      stack: error.stack,
+    });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
