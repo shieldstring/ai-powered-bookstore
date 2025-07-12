@@ -26,7 +26,6 @@ const server = http.createServer(app);
 // Enable CORS for all origins for your Express API (update in production as needed)
 app.use(cors());
 
-
 // Initialize Socket.IO
 const io = new Server(server, {
   cors: {
@@ -82,6 +81,7 @@ const searchRoutes = require("./routes/searchRoutes");
 const orderRoutes = require("./routes/orderRoutes"); // Order routes
 const userRoutes = require("./routes/userRoutes"); // User routes
 const notificationRoutes = require("./routes/notificationRoutes");
+const sellerRoutes = require("./routes/sellerRoutes");
 
 // Use Routes
 app.use("/api/auth", authRoutes); // Authentication routes
@@ -102,6 +102,7 @@ app.use("/api/search", searchRoutes); // Global search routes
 app.use("/api/orders", protect, orderRoutes); // Order routes
 app.use("/api/users", protect, userRoutes); // User routes
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/sellers", sellerRoutes);
 
 // Socket.IO for real-time communication
 io.on("connection", (socket) => {
@@ -117,7 +118,10 @@ io.on("connection", (socket) => {
   socket.on("typingInConversation", (conversationId) => {
     // Assuming socket.userId is attached during authentication
     if (socket.userId) {
-      socket.to(conversationId).emit("userTypingInConversation", { conversationId, userId: socket.userId });
+      socket.to(conversationId).emit("userTypingInConversation", {
+        conversationId,
+        userId: socket.userId,
+      });
     }
   });
 
@@ -125,7 +129,10 @@ io.on("connection", (socket) => {
   socket.on("stopTypingInConversation", (conversationId) => {
     // Assuming socket.userId is attached during authentication
     if (socket.userId) {
-      socket.to(conversationId).emit("userStopTypingInConversation", { conversationId, userId: socket.userId });
+      socket.to(conversationId).emit("userStopTypingInConversation", {
+        conversationId,
+        userId: socket.userId,
+      });
     }
   });
 
@@ -133,7 +140,7 @@ io.on("connection", (socket) => {
   socket.on("messagesRead", async ({ conversationId, messageIds }) => {
     // Assuming socket.userId is attached during authentication
     if (!socket.userId) {
- return; // Or handle unauthorized access
+      return; // Or handle unauthorized access
     }
 
     try {
@@ -144,8 +151,14 @@ io.on("connection", (socket) => {
       );
 
       // Emit a messagesRead event to other participants in the conversation
-      socket.to(conversationId).emit("messagesRead", { conversationId, userId: socket.userId, messageIds });
-      console.log(`User ${socket.userId} read messages ${messageIds} in conversation ${conversationId}`);
+      socket.to(conversationId).emit("messagesRead", {
+        conversationId,
+        userId: socket.userId,
+        messageIds,
+      });
+      console.log(
+        `User ${socket.userId} read messages ${messageIds} in conversation ${conversationId}`
+      );
     } catch (error) {
       console.error("Error handling messages read:", error);
       // Optionally, emit an error event back to the sender
@@ -168,7 +181,10 @@ io.on("connection", (socket) => {
       );
 
       socket.leave(conversationId); // Have the socket leave the Socket.IO room
-      socket.to(conversationId).emit("userLeftConversation", { conversationId, userId: socket.userId });
+      socket.to(conversationId).emit("userLeftConversation", {
+        conversationId,
+        userId: socket.userId,
+      });
       console.log(`User ${socket.userId} left conversation ${conversationId}`);
     } catch (error) {
       console.error("Error handling leave conversation:", error);
@@ -188,7 +204,6 @@ io.on("connection", (socket) => {
     io.emit("userStatus", { userId: socket.id, status: "offline" });
   });
 });
-
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -504,7 +504,7 @@ const getSavedPosts = async (req, res) => {
       path: "savedPosts",
       populate: {
         path: "user",
-        select: "name profilePicture",
+        select: "name profilePicture mlmTier",
       },
     });
 

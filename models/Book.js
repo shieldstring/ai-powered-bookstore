@@ -61,6 +61,11 @@ const bookSchema = new mongoose.Schema(
       trim: true,
       maxlength: [100, "Author name cannot exceed 100 characters"],
     },
+    seller: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Seller",
+      required: true,
+    },
     description: {
       type: String,
       trim: true,
