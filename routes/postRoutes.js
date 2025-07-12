@@ -15,7 +15,7 @@ const {
   getSavedPosts,
   getReportedPosts,
 } = require("../controllers/postController");
-const { protect } = require("../middleware/authMiddleware");
+const { protect, admin } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -50,6 +50,6 @@ router.put("/:id", protect, editPost); // Edit post
 router.post("/:id/report", protect, reportPost); // Report post
 router.post("/:id/save", protect, toggleSavePost); // Save/unsave
 router.get("/saved/all", protect, getSavedPosts); // Get saved posts
-router.get("/admin/reported", protect, admin, getReportedPosts); // ✅ Admin view for reported posts
+router.get("/admin/reported", protect, admin, getReportedPosts); // view for reported posts
 
 module.exports = router;
