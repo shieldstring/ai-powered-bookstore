@@ -59,8 +59,8 @@ const createPost = async (req, res) => {
 const getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate("user", "name avatar") // Populate user who created the post
-      .populate("comments.user", "name avatar"); // Populate user for each comment
+      .populate("user", "name profilePicture") // Simplified populate first
+      .populate("comments.user", "name profilePicture"); // Simplified populate first
 
     if (!post) {
       return res.status(404).json({
