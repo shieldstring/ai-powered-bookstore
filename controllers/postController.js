@@ -1,3 +1,4 @@
+const User = require("../models/User");
 const Post = require("../models/Post");
 
 // Helper function to extract hashtags and mentions
