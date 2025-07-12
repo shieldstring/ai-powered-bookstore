@@ -59,7 +59,7 @@ const createPost = async (req, res) => {
 const getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate("user", "name profilePicture") // Simplified populate first
+      .populate("user", "name profilePicture mlmTier") // Simplified populate first
       .populate("comments.user", "name profilePicture"); // Simplified populate first
 
     if (!post) {
