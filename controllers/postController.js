@@ -420,6 +420,116 @@ const deletePost = async (req, res) => {
   }
 };
 
+// Edit Post
+const editPost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { content } = req.body;
+    const userId = req.user._id;
+
+    const post = await Post.findById(id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    if (
+      post.user.toString() !== userId.toString() &&
+      req.user.role !== "admin"
+    ) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to edit this post" });
+    }
+
+    post.content.text = content?.text ?? post.content.text;
+    post.content.imageUrl = content?.imageUrl ?? post.content.imageUrl;
+    post.content.videoUrl = content?.videoUrl ?? post.content.videoUrl;
+
+    const updatedPost = await post.save();
+    res.json(updatedPost);
+  } catch (error) {
+    console.error("Error editing post:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Report Post
+const reportPost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+    const userId = req.user._id;
+
+    const post = await Post.findById(id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    post.reports.push({ user: userId, reason, createdAt: new Date() });
+    await post.save();
+
+    res.status(200).json({ message: "Post reported" });
+  } catch (error) {
+    console.error("Error reporting post:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Save/Unsave Post
+const toggleSavePost = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = req.user;
+
+    const postIndex = user.savedPosts.findIndex(
+      (postId) => postId.toString() === id
+    );
+
+    if (postIndex === -1) {
+      user.savedPosts.push(id);
+      await user.save();
+      return res.status(200).json({ message: "Post saved" });
+    } else {
+      user.savedPosts.splice(postIndex, 1);
+      await user.save();
+      return res.status(200).json({ message: "Post unsaved" });
+    }
+  } catch (error) {
+    console.error("Error saving/unsaving post:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get Saved Posts
+const getSavedPosts = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate({
+      path: "savedPosts",
+      populate: { path: "user", select: "name profilePicture" },
+    });
+
+    res.status(200).json(user.savedPosts);
+  } catch (error) {
+    console.error("Error fetching saved posts:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const getReportedPosts = async (req, res) => {
+  try {
+    // Only allow admin access
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Not authorized as admin" });
+    }
+
+    const posts = await Post.find({ "reports.0": { $exists: true } })
+      .populate("user", "name profilePicture")
+      .populate("reports.user", "name profilePicture")
+      .sort({ "reports.createdAt": -1 });
+
+    res.status(200).json(posts);
+  } catch (error) {
+    console.error("Error fetching reported posts:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
 module.exports = {
   createPost,
   getPostById,
@@ -430,4 +540,9 @@ module.exports = {
   likeUnlikeComment,
   replyComment,
   deletePost,
+  editPost,
+  reportPost,
+  toggleSavePost,
+  getSavedPosts,
+  getReportedPosts,
 };

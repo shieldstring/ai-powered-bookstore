@@ -47,6 +47,14 @@ const PostSchema = new Schema({
       ],
     },
   ],
+
+  reports: [
+    {
+      user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      reason: String,
+      createdAt: { type: Date, default: Date.now },
+    },
+  ],
   isHidden: {
     type: Boolean,
     default: false,

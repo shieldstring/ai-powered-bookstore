@@ -53,6 +53,10 @@ const userSchema = mongoose.Schema(
       default: () => ({}),
     },
 
+    savedPosts: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Post" }
+    ],
+
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     isPublic: { type: Boolean, default: true },

@@ -9,6 +9,11 @@ const {
   likeUnlikeComment,
   replyComment,
   deletePost,
+  editPost,
+  reportPost,
+  toggleSavePost,
+  getSavedPosts,
+  getReportedPosts,
 } = require("../controllers/postController");
 const { protect } = require("../middleware/authMiddleware");
 
@@ -40,5 +45,11 @@ router.put("/:postId/comments/:commentId/like", protect, likeUnlikeComment);
 
 // Protected: Reply comment
 router.post("/:postId/comments/:commentId/reply", protect, replyComment);
+
+router.put("/:id", protect, editPost); // Edit post
+router.post("/:id/report", protect, reportPost); // Report post
+router.post("/:id/save", protect, toggleSavePost); // Save/unsave
+router.get("/saved/all", protect, getSavedPosts); // Get saved posts
+router.get("/admin/reported", protect, admin, getReportedPosts); // ✅ Admin view for reported posts
 
 module.exports = router;
