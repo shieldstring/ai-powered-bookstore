@@ -2,297 +2,251 @@ const Seller = require("../models/Seller");
 const User = require("../models/User");
 const Book = require("../models/Book");
 const Notification = require("../models/Notification");
-const sendFCMNotification = require("../utils/sendFCMNotification"); // hypothetical helper for FCM
+const NotificationService = require("../notificationService");
+const sendEmail = require("../utils/sendEmail");
 
-// Register as a Seller
+const moment = require("moment");
+const { Parser } = require("json2csv");
+
+// Seller actions
 const registerSeller = async (req, res) => {
   try {
-    const userId = req.user._id;
-    const { storeName, banner, logo, bio } = req.body;
+    const { storeName, bio, banner, logo } = req.body;
 
-    let seller = await Seller.findOne({ user: userId });
+    const existing = await Seller.findOne({ user: req.user._id });
+    if (existing) return res.status(400).json({ message: "Seller profile already exists" });
 
-    if (seller && seller.status === "approved") {
-      return res.status(400).json({ message: "User is already a seller" });
-    }
-
-    if (seller && seller.status === "rejected") {
-      seller.storeName = storeName;
-      seller.banner = banner;
-      seller.logo = logo;
-      seller.bio = bio;
-      seller.status = "pending";
-      await seller.save();
-
-      await Notification.create({
-        recipient: userId,
-        type: "seller",
-        message: "Your request to re-apply as a seller has been submitted.",
-        entityId: seller._id,
-      });
-
-      await sendFCMNotification(
-        userId,
-        "Seller Re-application Submitted",
-        "Your request to re-apply as a seller has been submitted."
-      );
-
-      return res
-        .status(200)
-        .json({ message: "Re-application submitted for review" });
-    }
-
-    if (seller) {
-      return res
-        .status(400)
-        .json({ message: "Seller application already submitted" });
-    }
-
-    seller = new Seller({
-      user: userId,
+    const seller = new Seller({
+      user: req.user._id,
       storeName,
+      bio,
       banner,
       logo,
-      bio,
       status: "pending",
     });
 
     await seller.save();
-
-    await Notification.create({
-      recipient: userId,
-      type: "seller",
-      message:
-        "Your request to register as a seller has been received and is under review.",
-      entityId: seller._id,
-    });
-
-    await sendFCMNotification(
-      userId,
-      "Seller Application Submitted",
-      "Your request to register as a seller has been received and is under review."
-    );
-
-    res
-      .status(201)
-      .json({ message: "Seller registration submitted for review" });
+    res.status(201).json({ message: "Seller registration submitted" });
   } catch (error) {
-    console.error("Error registering seller:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Edit Seller Profile
 const editSellerProfile = async (req, res) => {
   try {
     const seller = await Seller.findOne({ user: req.user._id });
-    if (!seller || seller.status !== "approved") {
-      return res.status(403).json({ message: "Not authorized as a seller" });
-    }
+    if (!seller) return res.status(404).json({ message: "Seller not found" });
 
-    const { storeName, banner, logo, bio } = req.body;
-    if (storeName) seller.storeName = storeName;
-    if (banner) seller.banner = banner;
-    if (logo) seller.logo = logo;
-    if (bio) seller.bio = bio;
-
+    Object.assign(seller, req.body);
+    seller.status = "pending";
     await seller.save();
-    res.json({ message: "Seller profile updated", seller });
+
+    res.status(200).json({ message: "Seller profile updated. Awaiting re-approval." });
   } catch (error) {
-    console.error("Error editing seller profile:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Delete Seller Profile
 const deleteSellerProfile = async (req, res) => {
   try {
     const seller = await Seller.findOneAndDelete({ user: req.user._id });
-    if (!seller) {
-      return res.status(404).json({ message: "Seller not found" });
-    }
-    res.json({ message: "Seller profile deleted" });
+    if (!seller) return res.status(404).json({ message: "Seller profile not found" });
+    res.status(200).json({ message: "Seller profile deleted" });
   } catch (error) {
-    console.error("Error deleting seller profile:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Get seller storefront
 const getSellerStorefront = async (req, res) => {
   try {
-    const seller = await Seller.findById(req.params.id).populate(
-      "user",
-      "name profilePicture"
-    );
-    if (!seller || seller.status !== "approved") {
-      return res
-        .status(404)
-        .json({ message: "Seller not found or not approved" });
-    }
+    const seller = await Seller.findById(req.params.id).populate("user", "name");
+    if (!seller) return res.status(404).json({ message: "Seller not found" });
 
     const books = await Book.find({ seller: seller._id, isActive: true });
     res.json({ seller, books });
   } catch (error) {
-    console.error("Error fetching storefront:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Get seller dashboard
 const getSellerDashboard = async (req, res) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
-
+    const { startDate, endDate } = req.query;
     const seller = await Seller.findOne({ user: req.user._id });
-    if (!seller || seller.status !== "approved") {
-      return res.status(403).json({ message: "Not authorized as a seller" });
-    }
+    if (!seller) return res.status(404).json({ message: "Seller not found" });
 
-    const books = await Book.find({ seller: seller._id })
-      .skip(skip)
-      .limit(limit);
-    const totalBooks = await Book.countDocuments({ seller: seller._id });
+    const books = await Book.find({ seller: seller._id });
 
-    const totalSales = books.reduce((sum, book) => sum + book.purchaseCount, 0);
-    const totalRevenue = books.reduce(
-      (sum, book) =>
-        sum + book.salesHistory.reduce((rev, s) => rev + s.revenue, 0),
+    const filteredBooks = books.map((book) => {
+      const salesHistory = book.salesHistory.filter((sh) => {
+        const date = moment(sh.date);
+        return (!startDate || date.isSameOrAfter(startDate)) && (!endDate || date.isSameOrBefore(endDate));
+      });
+      return { ...book.toObject(), salesHistory };
+    });
+
+    const totalRevenue = filteredBooks.reduce(
+      (sum, book) => sum + book.salesHistory.reduce((s, sh) => s + sh.revenue, 0),
       0
     );
+    const totalUnits = filteredBooks.reduce(
+      (sum, book) => sum + book.salesHistory.reduce((s, sh) => s + sh.quantity, 0),
+      0
+    );
+    const totalViews = filteredBooks.reduce((sum, book) => sum + book.viewCount, 0);
+    const averageRating = books.length
+      ? (
+          books.reduce((sum, book) => sum + (book.averageRating || 0), 0) /
+          books.length
+        ).toFixed(2)
+      : 0;
 
-    const salesByDate = {};
-    books.forEach((book) => {
-      book.salesHistory.forEach((sale) => {
-        const date = new Date(sale.date).toISOString().split("T")[0];
-        if (!salesByDate[date]) salesByDate[date] = 0;
-        salesByDate[date] += sale.revenue;
-      });
-    });
+    const chartData = filteredBooks.flatMap((book) =>
+      book.salesHistory.map((sh) => ({
+        date: moment(sh.date).format("YYYY-MM-DD"),
+        quantity: sh.quantity,
+        revenue: sh.revenue,
+      }))
+    );
 
-    res.json({
-      seller,
-      booksCount: totalBooks,
-      totalSales,
-      totalRevenue,
-      salesByDate,
-      currentPage: page,
-      totalPages: Math.ceil(totalBooks / limit),
-    });
+    res.json({ books: filteredBooks, totalRevenue, totalUnits, totalViews, averageRating, chartData });
   } catch (error) {
-    console.error("Error fetching seller dashboard:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Admin: Get pending sellers (paginated)
 const getPendingSellers = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+  const { page = 1, limit = 10 } = req.query;
+  const skip = (page - 1) * limit;
 
-    const total = await Seller.countDocuments({ status: "pending" });
-    const sellers = await Seller.find({ status: "pending" })
-      .populate("user", "name email")
-      .skip(skip)
-      .limit(limit);
+  const sellers = await Seller.find({ status: "pending" })
+    .populate("user", "email name")
+    .skip(skip)
+    .limit(parseInt(limit));
 
-    res.json({
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-      sellers,
-    });
-  } catch (error) {
-    console.error("Error fetching pending sellers:", error);
-    res.status(500).json({ message: "Server error" });
-  }
+  const total = await Seller.countDocuments({ status: "pending" });
+
+  res.json({ sellers, total });
 };
 
-// Admin: Get approved sellers (paginated)
 const getApprovedSellers = async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const skip = (page - 1) * limit;
+  const { page = 1, limit = 10 } = req.query;
+  const skip = (page - 1) * limit;
 
-    const total = await Seller.countDocuments({ status: "approved" });
-    const sellers = await Seller.find({ status: "approved" })
-      .populate("user", "name email")
-      .skip(skip)
-      .limit(limit);
+  const sellers = await Seller.find({ status: "approved" })
+    .populate("user", "email name")
+    .skip(skip)
+    .limit(parseInt(limit));
 
-    res.json({
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-      sellers,
-    });
-  } catch (error) {
-    console.error("Error fetching approved sellers:", error);
-    res.status(500).json({ message: "Server error" });
-  }
+  const total = await Seller.countDocuments({ status: "approved" });
+
+  res.json({ sellers, total });
 };
 
-// Admin: Approve seller
 const approveSeller = async (req, res) => {
-  try {
-    const seller = await Seller.findById(req.params.id).populate("user");
-    if (!seller) return res.status(404).json({ message: "Seller not found" });
+  const seller = await Seller.findById(req.params.id).populate("user");
+  if (!seller) return res.status(404).json({ message: "Seller not found" });
 
-    seller.status = "approved";
-    await seller.save();
+  seller.status = "approved";
+  await seller.save();
 
-    await Notification.create({
-      recipient: seller.user._id,
-      type: "seller",
-      message: "Congratulations! Your seller application has been approved.",
-      entityId: seller._id,
-    });
+  await NotificationService.sendPushNotification(
+    seller.user._id,
+    "Your seller account has been approved!",
+    { type: "sellerStatus", title: "Seller Approved" }
+  );
 
-    await sendFCMNotification(
-      seller.user._id,
-      "Seller Approved",
-      "Congratulations! Your seller application has been approved."
-    );
+  await sendEmail({
+    email: seller.user.email,
+    subject: "Seller Account Approved",
+    message: `Hi ${seller.user.name}, your seller profile has been approved.`
+  });
 
-    res.json({ message: "Seller approved" });
-  } catch (error) {
-    console.error("Error approving seller:", error);
-    res.status(500).json({ message: "Server error" });
-  }
+  res.status(200).json({ message: "Seller approved and notified" });
 };
 
-// Admin: Reject seller
 const rejectSeller = async (req, res) => {
+  const seller = await Seller.findById(req.params.id).populate("user");
+  if (!seller) return res.status(404).json({ message: "Seller not found" });
+
+  seller.status = "rejected";
+  await seller.save();
+
+  await NotificationService.sendPushNotification(
+    seller.user._id,
+    "Your seller account has been rejected.",
+    { type: "sellerStatus", title: "Seller Rejected" }
+  );
+
+  await sendEmail({
+    email: seller.user.email,
+    subject: "Seller Account Rejected",
+    message: `Hi ${seller.user.name}, unfortunately, your seller profile has been rejected.`
+  });
+
+  res.status(200).json({ message: "Seller rejected and notified" });
+};
+
+const requestReapproval = async (req, res) => {
+  const seller = await Seller.findOne({ user: req.user._id });
+  if (!seller || seller.status !== "rejected") {
+    return res.status(400).json({ message: "Seller not eligible for re-approval" });
+  }
+  seller.status = "pending";
+  await seller.save();
+  res.json({ message: "Re-approval requested" });
+};
+
+const deleteSellerByAdmin = async (req, res) => {
+  const seller = await Seller.findByIdAndDelete(req.params.id);
+  if (!seller) return res.status(404).json({ message: "Seller not found" });
+  res.status(200).json({ message: "Seller deleted by admin" });
+};
+
+const getAdminSellerMetrics = async (req, res) => {
   try {
-    const seller = await Seller.findById(req.params.id).populate("user");
-    if (!seller) return res.status(404).json({ message: "Seller not found" });
+    const { startDate, endDate, exportCsv } = req.query;
+    const query = {};
 
-    seller.status = "rejected";
-    await seller.save();
+    if (startDate || endDate) {
+      query.createdAt = {};
+      if (startDate) query.createdAt.$gte = new Date(startDate);
+      if (endDate) query.createdAt.$lte = new Date(endDate);
+    }
 
-    await Notification.create({
-      recipient: seller.user._id,
-      type: "seller",
-      message:
-        "Unfortunately, your seller application has been rejected. You may reapply with updated information.",
-      entityId: seller._id,
+    const sellers = await Seller.find(query).populate("user", "email name");
+
+    const approvedSellers = sellers.filter(s => s.status === "approved").length;
+    const pendingSellers = sellers.filter(s => s.status === "pending").length;
+    const rejectedSellers = sellers.filter(s => s.status === "rejected").length;
+
+    const dailyCounts = {};
+    sellers.forEach((s) => {
+      const day = moment(s.createdAt).format("YYYY-MM-DD");
+      dailyCounts[day] = (dailyCounts[day] || 0) + 1;
     });
 
-    await sendFCMNotification(
-      seller.user._id,
-      "Seller Rejected",
-      "Unfortunately, your seller application has been rejected. You may reapply."
-    );
+    const result = {
+      totalSellers: sellers.length,
+      approvedSellers,
+      pendingSellers,
+      rejectedSellers,
+      dailyCounts,
+    };
 
-    res.json({ message: "Seller rejected" });
+    if (exportCsv === "true") {
+      const fields = ["user.name", "user.email", "storeName", "status", "createdAt"];
+      const parser = new Parser({ fields });
+      const csv = parser.parse(sellers);
+
+      res.header("Content-Type", "text/csv");
+      res.attachment("seller_metrics.csv");
+      return res.send(csv);
+    }
+
+    res.json(result);
   } catch (error) {
-    console.error("Error rejecting seller:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
@@ -306,4 +260,7 @@ module.exports = {
   getApprovedSellers,
   approveSeller,
   rejectSeller,
+  requestReapproval,
+  deleteSellerByAdmin,
+  getAdminSellerMetrics,
 };

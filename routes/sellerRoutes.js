@@ -12,6 +12,7 @@ const {
   rejectSeller,
   requestReapproval,
   deleteSellerByAdmin,
+  getAdminSellerMetrics
 } = require("../controllers/sellerController");
 
 const { protect, admin, sellerOnly } = require("../middleware/authMiddleware");
@@ -32,5 +33,7 @@ router.get("/admin/approved", protect, admin, getApprovedSellers);
 router.put("/admin/approve/:id", protect, admin, approveSeller);
 router.put("/admin/reject/:id", protect, admin, rejectSeller);
 router.delete("/admin/delete/:id", protect, admin, deleteSellerByAdmin);
+router.get("/admin/", protect, admin, getAdminSellerMetrics);
+
 
 module.exports = router;
