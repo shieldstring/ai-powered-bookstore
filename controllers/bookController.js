@@ -139,147 +139,86 @@ const getBookById = async (req, res) => {
   }
 };
 
-// Add a new book
+// Add a new book (admin or seller)
 const addBook = async (req, res) => {
   try {
-    // Basic validation
-    if (
-      !req.body.title ||
-      !req.body.author ||
-      !req.body.isbn ||
-      !req.body.price ||
-      !req.body.category ||
-      !req.body.image
-    ) {
+    const { title, author, isbn, price, category, image } = req.body;
+
+    if (!title || !author || !isbn || !price || !category || !image) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
-    // Create book with automatic validation from model
-    const book = await Book.create(req.body);
+    const bookData = {
+      ...req.body,
+      isActive: true,
+    };
 
-    // Return simplified response
+    // If user is a seller, attach seller ID
+    if (req.user.role === "seller") {
+      bookData.seller = req.user._id;
+    }
+
+    const book = await Book.create(bookData);
+
     res.status(201).json({
       success: true,
+      message: "Book added successfully",
       data: {
         id: book._id,
         title: book.title,
         author: book.author,
+        seller: book.seller || null,
       },
     });
   } catch (error) {
-    console.error("Error creating book:", error);
-
-    // Handle validation errors
-    if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map((err) => ({
-        path: err.path,
-        message: err.message,
-      }));
-
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors,
-      });
-    }
-
-    // Handle duplicate ISBN
-    if (error.code === 11000 && error.keyPattern?.isbn) {
-      return res.status(400).json({
-        success: false,
-        message: "A book with this ISBN already exists",
-      });
-    }
-
-    // Generic error
+    console.error("Error adding book:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "Server error",
+      error: error.message,
     });
   }
 };
 
 // Update a book
-/**
- * @desc    Update a book (handles both PUT and PATCH)
- * @route   PUT /api/books/:id (full update)
- * @route   PATCH /api/books/:id (partial update)
- * @access  Private/Admin
- */
 const updateBook = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Validate book ID
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid book ID format",
+        message: "Invalid book ID",
       });
     }
 
-    // Find existing book with current values
-    const existingBook = await Book.findById(id);
-    if (!existingBook) {
+    const book = await Book.findById(id);
+    if (!book) {
       return res.status(404).json({
         success: false,
         message: "Book not found",
       });
     }
 
-    // Process incoming data
+    // Restrict seller to update their own book
+    if (
+      req.user.role === "seller" &&
+      book.seller?.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to update this book",
+      });
+    }
+
     const price = Math.round(Number(req.body.price));
     const originalPrice = req.body.originalPrice
       ? Math.round(Number(req.body.originalPrice))
       : undefined;
 
-    // Debug logging
-    console.log("Price validation context:", {
-      incomingPrice: req.body.price,
-      incomingOriginalPrice: req.body.originalPrice,
-      processedPrice: price,
-      processedOriginalPrice: originalPrice,
-      existingPrice: existingBook.price,
-      existingOriginalPrice: existingBook.originalPrice,
-    });
-
-    // Prepare update data
-    const updateData = {
-      ...req.body,
-      price,
-      originalPrice,
-      inventory: parseInt(req.body.inventory),
-      isActive: parseInt(req.body.inventory) > 0,
-      updatedAt: new Date(),
-    };
-
-    // Remove protected fields
-    delete updateData._id;
-    delete updateData.createdAt;
-    delete updateData.__v;
-
-    // Special handling for dimensions if provided
-    if (req.body.dimensions) {
-      if (typeof req.body.dimensions === "string") {
-        const dimParts = req.body.dimensions
-          .split("×")
-          .map((p) => parseFloat(p.trim()));
-        if (dimParts.length === 3) {
-          updateData.dimensions = {
-            height: dimParts[0],
-            width: dimParts[1],
-            thickness: dimParts[2],
-          };
-        }
-      } else {
-        updateData.dimensions = req.body.dimensions;
-      }
-    }
-
-    // IMPORTANT: Manually validate price relationship before saving
     if (originalPrice !== undefined && originalPrice < price) {
       return res.status(400).json({
         success: false,
@@ -292,107 +231,39 @@ const updateBook = async (req, res) => {
       });
     }
 
-    // Update the document in a way that ensures validators see correct context
-    Object.assign(existingBook, updateData);
+    const updateData = {
+      ...req.body,
+      price,
+      originalPrice,
+      inventory: parseInt(req.body.inventory),
+      isActive: parseInt(req.body.inventory) > 0,
+      updatedAt: new Date(),
+    };
 
-    // Manually validate the document
-    const validationError = existingBook.validateSync();
-    if (validationError) {
-      const errors = {};
-      Object.keys(validationError.errors).forEach((key) => {
-        errors[key] = validationError.errors[key].message;
-      });
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors,
-      });
-    }
-
-    // Save the updated document
-    const updatedBook = await existingBook.save();
-
-    // Handle inventory changes if modified
-    if (
-      req.body.inventory !== undefined &&
-      parseInt(req.body.inventory) !== existingBook.inventory
-    ) {
-      const adjustment = parseInt(req.body.inventory) - existingBook.inventory;
-
-      await Book.findByIdAndUpdate(id, {
-        $push: {
-          inventoryHistory: {
-            date: new Date(),
-            adjustment,
-            newValue: parseInt(req.body.inventory),
-            reason: "Admin update",
-            admin: req.user?._id || "system",
-          },
-        },
-      });
-    }
+    Object.assign(book, updateData);
+    await book.save();
 
     res.json({
       success: true,
-      message: "Book updated successfully",
-      data: updatedBook,
+      message: "Book updated",
+      data: book,
     });
   } catch (error) {
-    console.error("Update error:", {
-      name: error.name,
-      message: error.message,
-      stack: error.stack,
-      code: error.code,
-      keyPattern: error.keyPattern,
-    });
-
-    if (error.name === "ValidationError") {
-      const errors = {};
-      Object.keys(error.errors).forEach((key) => {
-        errors[key] = error.errors[key].message;
-      });
-      return res.status(400).json({
-        success: false,
-        message: "Validation failed",
-        errors,
-      });
-    }
-
-    if (error.code === 11000) {
-      const field = Object.keys(error.keyPattern)[0];
-      return res.status(400).json({
-        success: false,
-        message: `${field} already exists`,
-        field,
-      });
-    }
-
+    console.error("Error updating book:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
-      ...(process.env.NODE_ENV === "development" && {
-        error: error.message,
-      }),
+      message: "Server error",
+      error: error.message,
     });
   }
 };
 
-// Delete a book (soft delete)
+// Delete (soft remove) a book
 const deleteBook = async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid book ID format",
-      });
-    }
+    const { id } = req.params;
 
-    const book = await Book.findByIdAndUpdate(
-      req.params.id,
-      { isActive: false },
-      { new: true }
-    );
-
+    const book = await Book.findById(id);
     if (!book) {
       return res.status(404).json({
         success: false,
@@ -400,16 +271,59 @@ const deleteBook = async (req, res) => {
       });
     }
 
+    if (
+      req.user.role === "seller" &&
+      book.seller?.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized to delete this book",
+      });
+    }
+
+    book.isActive = false;
+    await book.save();
+
     res.json({
       success: true,
-      message: "Book deactivated successfully",
+      message: "Book removed",
       data: book,
     });
   } catch (error) {
     console.error("Error deleting book:", error);
     res.status(500).json({
       success: false,
-      message: "Server error while deleting book",
+      message: "Server error",
+      error: error.message,
+    });
+  }
+};
+
+// Get books added by the current seller
+const getSellerBooks = async (req, res) => {
+  try {
+    if (req.user.role !== "seller") {
+      return res.status(403).json({
+        success: false,
+        message: "Only sellers can access their books",
+      });
+    }
+
+    const books = await Book.find({
+      seller: req.user._id,
+      isActive: true,
+    }).lean();
+
+    res.json({
+      success: true,
+      count: books.length,
+      data: books,
+    });
+  } catch (error) {
+    console.error("Error fetching seller books:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
       error: error.message,
     });
   }
@@ -725,4 +639,5 @@ module.exports = {
   bulkUpdateInventory,
   getRecommendations,
   trackPurchase,
+  getSellerBooks,
 };

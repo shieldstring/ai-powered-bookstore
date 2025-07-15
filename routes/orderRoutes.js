@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect, admin } = require('../middleware/authMiddleware');
+const { protect, admin, seller } = require('../middleware/authMiddleware');
 const {
   createOrder,
   getOrders,
@@ -8,18 +8,36 @@ const {
   updateOrderStatus,
   cancelOrder,
   deleteOrder,
-  verifyPayment
+  verifyPayment,
+  getOrderStatusSummary
 } = require('../controllers/orderController');
 
 const router = express.Router();
 
-router.post('/', protect, createOrder); // Create a new order
-router.get('/', protect, getOrders); // Get all orders for the user
-router.get('/:id', protect, getOrderById); // Get a single order by ID
-router.post('/verify-payment', protect, verifyPayment); //verify
-router.get('/admin/all', protect, admin, getAllOrders); // Get all orders (admin only)
-router.put('/:id/status', protect, admin, updateOrderStatus); // Update order status (admin only)
-router.put('/:id/cancel', protect, admin, cancelOrder); // Cancel an order (admin only)
-router.delete('/:id', protect, admin, deleteOrder); // Delete an order (admin only)
+// Create order
+router.post('/', protect, createOrder);
+
+// User orders
+router.get('/', protect, getOrders);
+router.get('/:id', protect, getOrderById);
+
+// Verify payment
+router.post('/verify-payment', protect, verifyPayment);
+
+// Admin & Seller shared access routes
+router.get('/admin/all', protect, admin, getAllOrders);
+router.get('/seller/all', protect, seller, getAllOrders);
+
+// Update order item status (Admin & Seller)
+router.put('/:orderId/item/:bookId/status', protect, updateOrderStatus);
+
+// Cancel order or items (Admin & Seller)
+router.put('/:orderId/cancel', protect, cancelOrder);
+
+// Delete order (Admin & Seller)
+router.delete('/:orderId', protect, deleteOrder);
+
+// Get order status summary
+router.get('/:orderId/summary', protect, getOrderStatusSummary);
 
 module.exports = router;
