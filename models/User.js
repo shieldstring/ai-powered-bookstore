@@ -53,9 +53,7 @@ const userSchema = mongoose.Schema(
       default: () => ({}),
     },
 
-    savedPosts: [
-      { type: mongoose.Schema.Types.ObjectId, ref: "Post" }
-    ],
+    savedPosts: [{ type: mongoose.Schema.Types.ObjectId, ref: "Post" }],
 
     following: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
     followers: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],
@@ -87,8 +85,14 @@ userSchema.pre("save", async function (next) {
     let code;
     while (!isUnique) {
       const seed = this.email + Date.now() + Math.random();
-      code = crypto.createHash("md5").update(seed).digest("hex").substring(0, 8);
-      const existingUser = await mongoose.model("User").findOne({ referralCode: code });
+      code = crypto
+        .createHash("md5")
+        .update(seed)
+        .digest("hex")
+        .substring(0, 8);
+      const existingUser = await mongoose
+        .model("User")
+        .findOne({ referralCode: code });
       if (!existingUser) isUnique = true;
     }
     this.referralCode = code;
@@ -109,13 +113,25 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-userSchema.methods.addFcmToken = async function (token, deviceInfo = "unknown") {
-  const deviceString = typeof deviceInfo === "string" ? deviceInfo : "unknown device";
+userSchema.methods.addFcmToken = async function (
+  token,
+  deviceInfo = "unknown"
+) {
+  const deviceString =
+    typeof deviceInfo === "string" ? deviceInfo : "unknown device";
   const index = this.fcmTokens.findIndex((t) => t.token === token);
   if (index !== -1) {
-    this.fcmTokens[index] = { token, device: deviceString, lastUpdated: Date.now() };
+    this.fcmTokens[index] = {
+      token,
+      device: deviceString,
+      lastUpdated: Date.now(),
+    };
   } else {
-    this.fcmTokens.push({ token, device: deviceString, lastUpdated: Date.now() });
+    this.fcmTokens.push({
+      token,
+      device: deviceString,
+      lastUpdated: Date.now(),
+    });
   }
   await this.save();
   return this;
@@ -134,7 +150,12 @@ userSchema.methods.updateMLMTier = async function (tier) {
   return oldTier !== tier;
 };
 
-userSchema.methods.addEarnings = async function (amount, type = "other", description = "", relatedUser = null) {
+userSchema.methods.addEarnings = async function (
+  amount,
+  type = "other",
+  description = "",
+  relatedUser = null
+) {
   if (!amount || amount <= 0) return false;
   this.earnings += amount;
   await this.save();
@@ -165,7 +186,8 @@ userSchema.methods.getReferrals = async function (limit = 10, skip = 0) {
 };
 
 userSchema.methods.followUser = async function (userIdToFollow) {
-  if (this._id.toString() === userIdToFollow.toString()) throw new Error("Cannot follow yourself");
+  if (this._id.toString() === userIdToFollow.toString())
+    throw new Error("Cannot follow yourself");
   if (!this.following.includes(userIdToFollow)) {
     this.following.push(userIdToFollow);
     await this.save();
@@ -179,29 +201,42 @@ userSchema.methods.followUser = async function (userIdToFollow) {
 };
 
 userSchema.methods.unfollowUser = async function (userIdToUnfollow) {
-  this.following = this.following.filter((id) => id.toString() !== userIdToUnfollow.toString());
+  this.following = this.following.filter(
+    (id) => id.toString() !== userIdToUnfollow.toString()
+  );
   await this.save();
-  const userToUnfollow = await mongoose.model("User").findById(userIdToUnfollow);
+  const userToUnfollow = await mongoose
+    .model("User")
+    .findById(userIdToUnfollow);
   if (userToUnfollow) {
-    userToUnfollow.followers = userToUnfollow.followers.filter((id) => id.toString() !== this._id.toString());
+    userToUnfollow.followers = userToUnfollow.followers.filter(
+      (id) => id.toString() !== this._id.toString()
+    );
     await userToUnfollow.save();
   }
   return this;
 };
 
 userSchema.methods.blockUser = async function (userIdToBlock) {
-  if (this._id.toString() === userIdToBlock.toString()) throw new Error("Cannot block yourself");
+  if (this._id.toString() === userIdToBlock.toString())
+    throw new Error("Cannot block yourself");
   if (!this.blockedUsers.includes(userIdToBlock)) {
     this.blockedUsers.push(userIdToBlock);
-    this.following = this.following.filter((id) => id.toString() !== userIdToBlock.toString());
-    this.followers = this.followers.filter((id) => id.toString() !== userIdToBlock.toString());
+    this.following = this.following.filter(
+      (id) => id.toString() !== userIdToBlock.toString()
+    );
+    this.followers = this.followers.filter(
+      (id) => id.toString() !== userIdToBlock.toString()
+    );
     await this.save();
   }
   return this;
 };
 
 userSchema.methods.unblockUser = async function (userIdToUnblock) {
-  this.blockedUsers = this.blockedUsers.filter((id) => id.toString() !== userIdToUnblock.toString());
+  this.blockedUsers = this.blockedUsers.filter(
+    (id) => id.toString() !== userIdToUnblock.toString()
+  );
   await this.save();
   return this;
 };
@@ -212,7 +247,6 @@ userSchema.methods.isBlocked = function (userId) {
 
 // ===== Indexes (no duplication) =====
 userSchema.index({ name: 1 });
-userSchema.index({ email: 1 }, { unique: true }); // ✅ this is the only index for email
 userSchema.index({ referralCode: 1 }, { unique: true, sparse: true });
 userSchema.index({ referredBy: 1 });
 userSchema.index({ createdAt: -1 });
