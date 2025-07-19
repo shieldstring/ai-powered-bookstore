@@ -1,14 +1,12 @@
 const Seller = require("../models/Seller");
-const User = require("../models/User");
 const Book = require("../models/Book");
-const Notification = require("../models/Notification");
 const NotificationService = require("../notificationService");
 const sendEmail = require("../utils/sendEmail");
-
+const findSellerByIdOrSlug = require("../utils/findSellerByIdOrSlug");
 const moment = require("moment");
 const { Parser } = require("json2csv");
 
-// Seller actions
+// Seller registration (unchanged)
 const registerSeller = async (req, res) => {
   try {
     const { storeName, bio, banner, logo } = req.body;
@@ -57,9 +55,10 @@ const deleteSellerProfile = async (req, res) => {
   }
 };
 
+// Storefront (accepts ID or slug)
 const getSellerStorefront = async (req, res) => {
   try {
-    const seller = await Seller.findById(req.params.id).populate("user", "name");
+    const seller = await findSellerByIdOrSlug(req.params.id);
     if (!seller) return res.status(404).json({ message: "Seller not found" });
 
     const books = await Book.find({ seller: seller._id, isActive: true });
@@ -69,6 +68,7 @@ const getSellerStorefront = async (req, res) => {
   }
 };
 
+// Seller Dashboard (user-specific)
 const getSellerDashboard = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
@@ -80,7 +80,10 @@ const getSellerDashboard = async (req, res) => {
     const filteredBooks = books.map((book) => {
       const salesHistory = book.salesHistory.filter((sh) => {
         const date = moment(sh.date);
-        return (!startDate || date.isSameOrAfter(startDate)) && (!endDate || date.isSameOrBefore(endDate));
+        return (
+          (!startDate || date.isSameOrAfter(startDate)) &&
+          (!endDate || date.isSameOrBefore(endDate))
+        );
       });
       return { ...book.toObject(), salesHistory };
     });
@@ -96,8 +99,7 @@ const getSellerDashboard = async (req, res) => {
     const totalViews = filteredBooks.reduce((sum, book) => sum + book.viewCount, 0);
     const averageRating = books.length
       ? (
-          books.reduce((sum, book) => sum + (book.averageRating || 0), 0) /
-          books.length
+          books.reduce((sum, book) => sum + (book.averageRating || 0), 0) / books.length
         ).toFixed(2)
       : 0;
 
@@ -109,12 +111,20 @@ const getSellerDashboard = async (req, res) => {
       }))
     );
 
-    res.json({ books: filteredBooks, totalRevenue, totalUnits, totalViews, averageRating, chartData });
+    res.json({
+      books: filteredBooks,
+      totalRevenue,
+      totalUnits,
+      totalViews,
+      averageRating,
+      chartData,
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
+// Admin seller actions (accept ID or slug)
 const getPendingSellers = async (req, res) => {
   const { page = 1, limit = 10 } = req.query;
   const skip = (page - 1) * limit;
@@ -144,47 +154,67 @@ const getApprovedSellers = async (req, res) => {
 };
 
 const approveSeller = async (req, res) => {
-  const seller = await Seller.findById(req.params.id).populate("user");
-  if (!seller) return res.status(404).json({ message: "Seller not found" });
+  try {
+    const seller = await findSellerByIdOrSlug(req.params.id);
+    if (!seller) return res.status(404).json({ message: "Seller not found" });
 
-  seller.status = "approved";
-  await seller.save();
+    seller.status = "approved";
+    await seller.save();
 
-  await NotificationService.sendPushNotification(
-    seller.user._id,
-    "Your seller account has been approved!",
-    { type: "sellerStatus", title: "Seller Approved" }
-  );
+    await NotificationService.sendPushNotification(
+      seller.user._id,
+      "Your seller account has been approved!",
+      { type: "sellerStatus", title: "Seller Approved" }
+    );
 
-  await sendEmail({
-    email: seller.user.email,
-    subject: "Seller Account Approved",
-    message: `Hi ${seller.user.name}, your seller profile has been approved.`
-  });
+    await sendEmail({
+      email: seller.user.email,
+      subject: "Seller Account Approved",
+      message: `Hi ${seller.user.name}, your seller profile has been approved.`,
+    });
 
-  res.status(200).json({ message: "Seller approved and notified" });
+    res.status(200).json({ message: "Seller approved and notified" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 };
 
 const rejectSeller = async (req, res) => {
-  const seller = await Seller.findById(req.params.id).populate("user");
-  if (!seller) return res.status(404).json({ message: "Seller not found" });
+  try {
+    const seller = await findSellerByIdOrSlug(req.params.id);
+    if (!seller) return res.status(404).json({ message: "Seller not found" });
 
-  seller.status = "rejected";
-  await seller.save();
+    seller.status = "rejected";
+    await seller.save();
 
-  await NotificationService.sendPushNotification(
-    seller.user._id,
-    "Your seller account has been rejected.",
-    { type: "sellerStatus", title: "Seller Rejected" }
-  );
+    await NotificationService.sendPushNotification(
+      seller.user._id,
+      "Your seller account has been rejected.",
+      { type: "sellerStatus", title: "Seller Rejected" }
+    );
 
-  await sendEmail({
-    email: seller.user.email,
-    subject: "Seller Account Rejected",
-    message: `Hi ${seller.user.name}, unfortunately, your seller profile has been rejected.`
-  });
+    await sendEmail({
+      email: seller.user.email,
+      subject: "Seller Account Rejected",
+      message: `Hi ${seller.user.name}, unfortunately, your seller profile has been rejected.`,
+    });
 
-  res.status(200).json({ message: "Seller rejected and notified" });
+    res.status(200).json({ message: "Seller rejected and notified" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+const deleteSellerByAdmin = async (req, res) => {
+  try {
+    const seller = await findSellerByIdOrSlug(req.params.id);
+    if (!seller) return res.status(404).json({ message: "Seller not found" });
+
+    await Seller.findByIdAndDelete(seller._id);
+    res.status(200).json({ message: "Seller deleted by admin" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 };
 
 const requestReapproval = async (req, res) => {
@@ -195,12 +225,6 @@ const requestReapproval = async (req, res) => {
   seller.status = "pending";
   await seller.save();
   res.json({ message: "Re-approval requested" });
-};
-
-const deleteSellerByAdmin = async (req, res) => {
-  const seller = await Seller.findByIdAndDelete(req.params.id);
-  if (!seller) return res.status(404).json({ message: "Seller not found" });
-  res.status(200).json({ message: "Seller deleted by admin" });
 };
 
 const getAdminSellerMetrics = async (req, res) => {
@@ -216,9 +240,9 @@ const getAdminSellerMetrics = async (req, res) => {
 
     const sellers = await Seller.find(query).populate("user", "email name");
 
-    const approvedSellers = sellers.filter(s => s.status === "approved").length;
-    const pendingSellers = sellers.filter(s => s.status === "pending").length;
-    const rejectedSellers = sellers.filter(s => s.status === "rejected").length;
+    const approvedSellers = sellers.filter((s) => s.status === "approved").length;
+    const pendingSellers = sellers.filter((s) => s.status === "pending").length;
+    const rejectedSellers = sellers.filter((s) => s.status === "rejected").length;
 
     const dailyCounts = {};
     sellers.forEach((s) => {
