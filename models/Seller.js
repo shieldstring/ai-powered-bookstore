@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
-const Book = require("../models/Book"); 
+const shortid = require("shortid");
 
 const sellerSchema = new mongoose.Schema(
   {
@@ -12,7 +12,7 @@ const sellerSchema = new mongoose.Schema(
     },
 
     storeName: { type: String, required: true },
-    slug: { type: String, unique: true },
+    slug: { type: String },
 
     banner: String,
     logo: String,
@@ -39,7 +39,7 @@ const sellerSchema = new mongoose.Schema(
     analytics: {
       totalRevenue: { type: Number, default: 0 },
       totalOrders: { type: Number, default: 0 },
-      totalProducts: { type: Number, default: 0 }, // Optional if you use virtual below
+      totalProducts: { type: Number, default: 0 },
     },
 
     averageRating: { type: Number, default: 0 },
@@ -52,13 +52,20 @@ const sellerSchema = new mongoose.Schema(
   }
 );
 
+/// --- Enhancement 1️⃣ + 2️⃣ ---
+/// Unique slug generation with fallback shortid to avoid duplicate errors
 sellerSchema.pre("save", function (next) {
   if (!this.isModified("storeName")) return next();
 
-  this.slug = slugify(this.storeName, { lower: true, strict: true });
+  const baseSlug = slugify(this.storeName, { lower: true, strict: true });
+  const randomId = shortid.generate().slice(0, 6);
+
+  this.slug = `${baseSlug}-${randomId}`;
   next();
 });
 
+/// --- Enhancement 3️⃣ ---
+/// Virtual field for dynamic book count
 sellerSchema.virtual("bookCount", {
   ref: "Book",
   localField: "_id",
@@ -66,7 +73,8 @@ sellerSchema.virtual("bookCount", {
   count: true,
 });
 
-sellerSchema.index({ slug: 1 });
+/// --- Indexes ---
+sellerSchema.index({ slug: 1 }, { unique: true }); // Enhancement 2️⃣: Explicit unique index
 sellerSchema.index({ status: 1 });
 
 module.exports = mongoose.model("Seller", sellerSchema);
