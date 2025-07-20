@@ -5,10 +5,20 @@ const User = require("../models/User");
 const Seller = require("../models/Seller");
 const bcrypt = require("bcryptjs");
 const crypto = require("crypto");
+const slugify = require("slugify");
 
 // Function to generate referral code
 function generateReferralCode() {
   return crypto.randomBytes(4).toString("hex").toUpperCase();
+}
+
+// Function to generate slug with randomness
+function generateSellerSlug(storeName) {
+  return (
+    slugify(storeName, { lower: true, strict: true }) +
+    "-" +
+    crypto.randomBytes(3).toString("hex")
+  );
 }
 
 async function createAdminAndPlatformSeller() {
@@ -47,12 +57,15 @@ async function createAdminAndPlatformSeller() {
 
     // -------- Platform Seller User --------
     const sellerEmail = "platformseller@example.com";
+    const storeName = "Official Bookstore";
+    const sellerSlug = generateSellerSlug(storeName);
 
     const sellerUserData = {
       name: "Platform Seller",
       email: sellerEmail,
       password: sellerPassword,
       role: "seller",
+      slug: sellerSlug,
       profilePicture: "https://example.com/avatars/platformseller.jpg",
       bio: "Official platform seller account for managing bookstore inventory.",
       level: 5,
@@ -80,7 +93,8 @@ async function createAdminAndPlatformSeller() {
     if (!existingSellerProfile) {
       await Seller.create({
         user: sellerUser._id,
-        storeName: "Official Bookstore",
+        storeName: storeName,
+        slug: sellerSlug,
         banner: "https://example.com/banners/platform.jpg",
         logo: "https://example.com/logos/platform_logo.png",
         bio: "Books sold directly by the bookstore platform.",
@@ -100,6 +114,7 @@ async function createAdminAndPlatformSeller() {
     console.log(
       `Platform Seller: ${sellerEmail} | Password: ${sellerPassword}`
     );
+    console.log(`Seller Slug: ${sellerSlug}`);
 
     await mongoose.disconnect();
     console.log("\nDisconnected from database");

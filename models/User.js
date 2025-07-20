@@ -22,6 +22,7 @@ const userSchema = mongoose.Schema(
     phone: { type: String },
     password: { type: String, required: true },
     role: { type: String, enum: ["user", "seller", "admin"], default: "user" },
+    slug: { type: String, unique: true, sparse: true },
     profilePicture: { type: String },
     bio: { type: String },
     level: { type: Number, default: 1 },

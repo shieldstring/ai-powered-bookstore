@@ -5,6 +5,8 @@ const sendEmail = require("../utils/sendEmail");
 const findSellerByIdOrSlug = require("../utils/findSellerByIdOrSlug");
 const moment = require("moment");
 const { Parser } = require("json2csv");
+const slugify = require("slugify");
+const User = require("../models/User");
 
 // Seller registration (unchanged)
 const registerSeller = async (req, res) => {
@@ -23,6 +25,16 @@ const registerSeller = async (req, res) => {
       logo,
       status: "pending",
     });
+
+    // Generate slug for User if not already present
+    const user = await User.findById(req.user._id);
+    if (!user.slug) {
+      user.slug =
+        slugify(storeName, { lower: true, strict: true }) +
+        "-" +
+        Math.random().toString(36).substring(2, 8);
+      await user.save();
+    }
 
     await seller.save();
     res.status(201).json({ message: "Seller registration submitted" });
@@ -64,7 +76,9 @@ const getSellerStorefront = async (req, res) => {
   try {
     const result = await findSellerByIdOrSlug(req.params.idOrSlug);
     if (!result) {
-      return res.status(404).json({ success: false, message: "Seller not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Seller not found" });
     }
 
     const { user, sellerProfile } = result;
@@ -89,7 +103,6 @@ const getSellerStorefront = async (req, res) => {
     });
   }
 };
-
 
 // Seller Dashboard (user-specific)
 const getSellerDashboard = async (req, res) => {
