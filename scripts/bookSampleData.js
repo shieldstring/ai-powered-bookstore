@@ -371,9 +371,32 @@ const bookSampleData = [
 async function insertSampleData() {
   try {
     const Book = require("../models/Book");
+    const User = require("../models/User");
+
+    // Find or create a seller (platform seller)
+    let seller = await User.findOne({ email: "platformseller@example.com" });
+
+    if (!seller) {
+      seller = await User.create({
+        name: "Platform Seller",
+        email: "platformseller@example.com",
+        password: "platformpassword123", // (hash before production use)
+        role: "seller",
+      });
+
+      console.log("Created platform seller account");
+    }
+
+    // Attach seller to each book
+    const booksWithSeller = bookSampleData.map((book) => ({
+      ...book,
+      seller: seller._id,
+    }));
+
     await Book.deleteMany({});
-    const result = await Book.insertMany(bookSampleData);
-    console.log(`Inserted ${result.length} books`);
+    const result = await Book.insertMany(booksWithSeller);
+
+    console.log(`Inserted ${result.length} books with seller`);
     return result;
   } catch (error) {
     console.error("Error inserting sample data:", error);
