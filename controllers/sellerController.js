@@ -12,7 +12,8 @@ const registerSeller = async (req, res) => {
     const { storeName, bio, banner, logo } = req.body;
 
     const existing = await Seller.findOne({ user: req.user._id });
-    if (existing) return res.status(400).json({ message: "Seller profile already exists" });
+    if (existing)
+      return res.status(400).json({ message: "Seller profile already exists" });
 
     const seller = new Seller({
       user: req.user._id,
@@ -39,7 +40,9 @@ const editSellerProfile = async (req, res) => {
     seller.status = "pending";
     await seller.save();
 
-    res.status(200).json({ message: "Seller profile updated. Awaiting re-approval." });
+    res
+      .status(200)
+      .json({ message: "Seller profile updated. Awaiting re-approval." });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
@@ -48,7 +51,8 @@ const editSellerProfile = async (req, res) => {
 const deleteSellerProfile = async (req, res) => {
   try {
     const seller = await Seller.findOneAndDelete({ user: req.user._id });
-    if (!seller) return res.status(404).json({ message: "Seller profile not found" });
+    if (!seller)
+      return res.status(404).json({ message: "Seller profile not found" });
     res.status(200).json({ message: "Seller profile deleted" });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -58,7 +62,8 @@ const deleteSellerProfile = async (req, res) => {
 // Storefront (accepts ID or slug)
 const getSellerStorefront = async (req, res) => {
   try {
-    const seller = await findSellerByIdOrSlug(req.params.id);
+    const seller = await findSellerByIdOrSlug(req.params.idOrSlug);
+
     if (!seller) return res.status(404).json({ message: "Seller not found" });
 
     const books = await Book.find({ seller: seller._id, isActive: true });
@@ -89,17 +94,23 @@ const getSellerDashboard = async (req, res) => {
     });
 
     const totalRevenue = filteredBooks.reduce(
-      (sum, book) => sum + book.salesHistory.reduce((s, sh) => s + sh.revenue, 0),
+      (sum, book) =>
+        sum + book.salesHistory.reduce((s, sh) => s + sh.revenue, 0),
       0
     );
     const totalUnits = filteredBooks.reduce(
-      (sum, book) => sum + book.salesHistory.reduce((s, sh) => s + sh.quantity, 0),
+      (sum, book) =>
+        sum + book.salesHistory.reduce((s, sh) => s + sh.quantity, 0),
       0
     );
-    const totalViews = filteredBooks.reduce((sum, book) => sum + book.viewCount, 0);
+    const totalViews = filteredBooks.reduce(
+      (sum, book) => sum + book.viewCount,
+      0
+    );
     const averageRating = books.length
       ? (
-          books.reduce((sum, book) => sum + (book.averageRating || 0), 0) / books.length
+          books.reduce((sum, book) => sum + (book.averageRating || 0), 0) /
+          books.length
         ).toFixed(2)
       : 0;
 
@@ -155,7 +166,8 @@ const getApprovedSellers = async (req, res) => {
 
 const approveSeller = async (req, res) => {
   try {
-    const seller = await findSellerByIdOrSlug(req.params.id);
+    const seller = await findSellerByIdOrSlug(req.params.idOrSlug);
+
     if (!seller) return res.status(404).json({ message: "Seller not found" });
 
     seller.status = "approved";
@@ -181,7 +193,8 @@ const approveSeller = async (req, res) => {
 
 const rejectSeller = async (req, res) => {
   try {
-    const seller = await findSellerByIdOrSlug(req.params.id);
+    const seller = await findSellerByIdOrSlug(req.params.idOrSlug);
+
     if (!seller) return res.status(404).json({ message: "Seller not found" });
 
     seller.status = "rejected";
@@ -207,7 +220,8 @@ const rejectSeller = async (req, res) => {
 
 const deleteSellerByAdmin = async (req, res) => {
   try {
-    const seller = await findSellerByIdOrSlug(req.params.id);
+    const seller = await findSellerByIdOrSlug(req.params.idOrSlug);
+
     if (!seller) return res.status(404).json({ message: "Seller not found" });
 
     await Seller.findByIdAndDelete(seller._id);
@@ -220,7 +234,9 @@ const deleteSellerByAdmin = async (req, res) => {
 const requestReapproval = async (req, res) => {
   const seller = await Seller.findOne({ user: req.user._id });
   if (!seller || seller.status !== "rejected") {
-    return res.status(400).json({ message: "Seller not eligible for re-approval" });
+    return res
+      .status(400)
+      .json({ message: "Seller not eligible for re-approval" });
   }
   seller.status = "pending";
   await seller.save();
@@ -240,9 +256,13 @@ const getAdminSellerMetrics = async (req, res) => {
 
     const sellers = await Seller.find(query).populate("user", "email name");
 
-    const approvedSellers = sellers.filter((s) => s.status === "approved").length;
+    const approvedSellers = sellers.filter(
+      (s) => s.status === "approved"
+    ).length;
     const pendingSellers = sellers.filter((s) => s.status === "pending").length;
-    const rejectedSellers = sellers.filter((s) => s.status === "rejected").length;
+    const rejectedSellers = sellers.filter(
+      (s) => s.status === "rejected"
+    ).length;
 
     const dailyCounts = {};
     sellers.forEach((s) => {
@@ -259,7 +279,13 @@ const getAdminSellerMetrics = async (req, res) => {
     };
 
     if (exportCsv === "true") {
-      const fields = ["user.name", "user.email", "storeName", "status", "createdAt"];
+      const fields = [
+        "user.name",
+        "user.email",
+        "storeName",
+        "status",
+        "createdAt",
+      ];
       const parser = new Parser({ fields });
       const csv = parser.parse(sellers);
 
