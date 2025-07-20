@@ -62,14 +62,33 @@ const deleteSellerProfile = async (req, res) => {
 // Storefront (accepts ID or slug)
 const getSellerStorefront = async (req, res) => {
   try {
-    const seller = await findSellerByIdOrSlug(req.params.idOrSlug);
+    const result = await findSellerByIdOrSlug(req.params.idOrSlug);
+    if (!result) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Seller not found" });
+    }
 
-    if (!seller) return res.status(404).json({ message: "Seller not found" });
+    const { user, sellerProfile } = result;
 
-    const books = await Book.find({ seller: seller._id, isActive: true });
-    res.json({ seller, books });
+    const books = await Book.find({ seller: user._id, isActive: true });
+
+    res.status(200).json({
+      success: true,
+      message: "Seller storefront fetched successfully",
+      data: {
+        user,
+        sellerProfile,
+        books,
+      },
+    });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error("Storefront error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch seller storefront",
+      error: error.message,
+    });
   }
 };
 

@@ -1,28 +1,24 @@
 const mongoose = require("mongoose");
+const User = require("../models/User");
 const Seller = require("../models/Seller");
 
 const findSellerByIdOrSlug = async (identifier) => {
-  if (mongoose.Types.ObjectId.isValid(identifier)) {
-    // Try as Seller ID first
-    let seller = await Seller.findById(identifier).populate(
-      "user",
-      "email name"
-    );
-    if (seller) return seller;
+  let user;
 
-    // Then try as User ID
-    seller = await Seller.findOne({ user: identifier }).populate(
-      "user",
-      "email name"
-    );
-    if (seller) return seller;
+  if (mongoose.Types.ObjectId.isValid(identifier)) {
+    user = await User.findById(identifier).select("name email role");
+  } else {
+    user = await User.findOne({ slug: identifier }).select("name email role");
   }
 
-  // Try as slug last
-  return await Seller.findOne({ slug: identifier }).populate(
-    "user",
-    "email name"
-  );
+  if (!user || user.role !== "seller") return null;
+
+  const sellerProfile = await Seller.findOne({ user: user._id });
+
+  return {
+    user,
+    sellerProfile,
+  };
 };
 
 module.exports = findSellerByIdOrSlug;
