@@ -64,9 +64,7 @@ const getSellerStorefront = async (req, res) => {
   try {
     const result = await findSellerByIdOrSlug(req.params.idOrSlug);
     if (!result) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Seller not found" });
+      return res.status(404).json({ success: false, message: "Seller not found" });
     }
 
     const { user, sellerProfile } = result;
@@ -91,6 +89,7 @@ const getSellerStorefront = async (req, res) => {
     });
   }
 };
+
 
 // Seller Dashboard (user-specific)
 const getSellerDashboard = async (req, res) => {

@@ -102,7 +102,7 @@ app.use("/api/search", searchRoutes); // Global search routes
 app.use("/api/orders", protect, orderRoutes); // Order routes
 app.use("/api/users", protect, userRoutes); // User routes
 app.use("/api/notifications", notificationRoutes);
-app.use("/api/sellers", sellerRoutes);
+app.use("/api/seller", sellerRoutes);
 
 // Socket.IO for real-time communication
 io.on("connection", (socket) => {
