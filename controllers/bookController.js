@@ -122,8 +122,8 @@ const getBookById = async (req, res) => {
       });
     }
 
-    // Increment view count
-    await book.incrementViews();
+    // Safe increment of view count
+    await Book.updateOne({ _id: book._id }, { $inc: { viewCount: 1 } });
 
     res.json({
       success: true,

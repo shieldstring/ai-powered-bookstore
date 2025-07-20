@@ -1,5 +1,5 @@
 const mongoose = require("mongoose");
-const { insertSampleData } = require("../bookSampleData");
+const { insertSampleData } = require("../scripts/bookSampleData");
 
 const connectDB = async (populateData = false) => {
   try {

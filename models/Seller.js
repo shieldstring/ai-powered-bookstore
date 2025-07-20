@@ -52,7 +52,6 @@ const sellerSchema = new mongoose.Schema(
   }
 );
 
-/// --- Enhancement 1️⃣ + 2️⃣ ---
 /// Unique slug generation with fallback shortid to avoid duplicate errors
 sellerSchema.pre("save", function (next) {
   if (!this.isModified("storeName")) return next();
@@ -64,7 +63,6 @@ sellerSchema.pre("save", function (next) {
   next();
 });
 
-/// --- Enhancement 3️⃣ ---
 /// Virtual field for dynamic book count
 sellerSchema.virtual("bookCount", {
   ref: "Book",
@@ -74,7 +72,7 @@ sellerSchema.virtual("bookCount", {
 });
 
 /// --- Indexes ---
-sellerSchema.index({ slug: 1 }, { unique: true }); // Enhancement 2️⃣: Explicit unique index
+sellerSchema.index({ slug: 1 }, { unique: true }); 
 sellerSchema.index({ status: 1 });
 
 module.exports = mongoose.model("Seller", sellerSchema);

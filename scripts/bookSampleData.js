@@ -370,7 +370,7 @@ const bookSampleData = [
 // Insert function remains the same
 async function insertSampleData() {
   try {
-    const Book = require("./models/Book");
+    const Book = require("../models/Book");
     await Book.deleteMany({});
     const result = await Book.insertMany(bookSampleData);
     console.log(`Inserted ${result.length} books`);
