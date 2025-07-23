@@ -25,8 +25,8 @@ router.get("/:id", protect, getOrderById);
 router.post("/verify-payment", protect, verifyPayment);
 
 // Admin & Seller shared access routes
-router.get("/admin/all", protect, admin, getAllOrders);
-router.get("/seller/all", protect, sellerOnly, getAllOrders);
+router.get("/admin/all", protect, getAllOrders);
+router.get("/seller/all", protect, getAllOrders);
 
 // Update order item status (Admin & Seller)
 router.put("/:orderId/item/:bookId/status", protect, updateOrderStatus);

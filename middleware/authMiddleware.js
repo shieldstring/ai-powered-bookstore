@@ -36,7 +36,7 @@ const sellerOnly = async (req, res, next) => {
   try {
     const seller = await Seller.findOne({ user: req.user._id });
 
-    if (!seller || seller.status !== "approved") {
+    if (!seller) {
       return res
         .status(403)
         .json({ message: "Not authorized as an approved seller" });
