@@ -8,7 +8,7 @@ const { Parser } = require("json2csv");
 const slugify = require("slugify");
 const User = require("../models/User");
 
-// Seller registration 
+// Seller registration
 const registerSeller = async (req, res) => {
   try {
     const {
@@ -60,6 +60,10 @@ const registerSeller = async (req, res) => {
 
     await seller.save();
 
+    // Update user role to seller
+    user.role = "seller";
+    await user.save();
+    
     res.status(201).json({
       message: "Seller registration submitted",
       data: {
@@ -106,9 +110,12 @@ const editSellerProfile = async (req, res) => {
 
     // Update payoutDetails if provided
     if (payoutDetails) {
-      seller.payoutDetails.bankName = payoutDetails.bankName || seller.payoutDetails.bankName;
-      seller.payoutDetails.accountNumber = payoutDetails.accountNumber || seller.payoutDetails.accountNumber;
-      seller.payoutDetails.accountName = payoutDetails.accountName || seller.payoutDetails.accountName;
+      seller.payoutDetails.bankName =
+        payoutDetails.bankName || seller.payoutDetails.bankName;
+      seller.payoutDetails.accountNumber =
+        payoutDetails.accountNumber || seller.payoutDetails.accountNumber;
+      seller.payoutDetails.accountName =
+        payoutDetails.accountName || seller.payoutDetails.accountName;
     }
 
     // Regenerate slugs if storeName changed
