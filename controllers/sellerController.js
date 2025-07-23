@@ -8,26 +8,28 @@ const { Parser } = require("json2csv");
 const slugify = require("slugify");
 const User = require("../models/User");
 
-// Seller registration (unchanged)
+// Seller registration 
 const registerSeller = async (req, res) => {
   try {
-    const { storeName, bio, banner, logo } = req.body;
-
-    const existing = await Seller.findOne({ user: req.user._id });
-    if (existing)
-      return res.status(400).json({ message: "Seller profile already exists" });
-
-    const seller = new Seller({
-      user: req.user._id,
+    const {
       storeName,
       bio,
       banner,
       logo,
-      status: "pending",
-    });
+      contactEmail,
+      contactPhone,
+      address,
+      payoutDetails, // { bankName, accountNumber, accountName }
+    } = req.body;
 
-    // Generate slug for User if not already present
+    const existingSeller = await Seller.findOne({ user: req.user._id });
+    if (existingSeller) {
+      return res.status(400).json({ message: "Seller profile already exists" });
+    }
+
     const user = await User.findById(req.user._id);
+
+    // Generate slug for User if missing
     if (!user.slug) {
       user.slug =
         slugify(storeName, { lower: true, strict: true }) +
@@ -36,25 +38,102 @@ const registerSeller = async (req, res) => {
       await user.save();
     }
 
+    // Generate slug for Seller
+    const sellerSlug =
+      slugify(storeName, { lower: true, strict: true }) +
+      "-" +
+      Math.random().toString(36).substring(2, 8);
+
+    const seller = new Seller({
+      user: req.user._id,
+      storeName,
+      bio,
+      banner,
+      logo,
+      contactEmail,
+      contactPhone,
+      address,
+      payoutDetails,
+      slug: sellerSlug,
+      status: "pending",
+    });
+
     await seller.save();
-    res.status(201).json({ message: "Seller registration submitted" });
+
+    res.status(201).json({
+      message: "Seller registration submitted",
+      data: {
+        seller,
+        userSlug: user.slug,
+        sellerSlug: seller.slug,
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
+// edit Seller Profile
 const editSellerProfile = async (req, res) => {
   try {
     const seller = await Seller.findOne({ user: req.user._id });
-    if (!seller) return res.status(404).json({ message: "Seller not found" });
+    if (!seller) {
+      return res.status(404).json({ message: "Seller not found" });
+    }
 
-    Object.assign(seller, req.body);
-    seller.status = "pending";
+    const {
+      storeName,
+      bio,
+      banner,
+      logo,
+      contactEmail,
+      contactPhone,
+      address,
+      payoutDetails, // { bankName, accountNumber, accountName }
+    } = req.body;
+
+    // Track if storeName changes for slug regeneration
+    const storeNameChanged = storeName && storeName !== seller.storeName;
+
+    // Update base fields
+    seller.storeName = storeName || seller.storeName;
+    seller.bio = bio || seller.bio;
+    seller.banner = banner || seller.banner;
+    seller.logo = logo || seller.logo;
+    seller.contactEmail = contactEmail || seller.contactEmail;
+    seller.contactPhone = contactPhone || seller.contactPhone;
+    seller.address = address || seller.address;
+
+    // Update payoutDetails if provided
+    if (payoutDetails) {
+      seller.payoutDetails.bankName = payoutDetails.bankName || seller.payoutDetails.bankName;
+      seller.payoutDetails.accountNumber = payoutDetails.accountNumber || seller.payoutDetails.accountNumber;
+      seller.payoutDetails.accountName = payoutDetails.accountName || seller.payoutDetails.accountName;
+    }
+
+    // Regenerate slugs if storeName changed
+    if (storeNameChanged) {
+      const newSlug =
+        slugify(storeName, { lower: true, strict: true }) +
+        "-" +
+        Math.random().toString(36).substring(2, 8);
+
+      seller.slug = newSlug;
+
+      const user = await User.findById(req.user._id);
+      user.slug = newSlug;
+      await user.save();
+    }
+
+    seller.status = "pending"; // Trigger re-approval
     await seller.save();
 
-    res
-      .status(200)
-      .json({ message: "Seller profile updated. Awaiting re-approval." });
+    res.status(200).json({
+      message: "Seller profile updated. Awaiting re-approval.",
+      data: {
+        seller,
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
   }

@@ -72,7 +72,7 @@ sellerSchema.virtual("bookCount", {
 });
 
 /// --- Indexes ---
-sellerSchema.index({ slug: 1 }, { unique: true }); 
+sellerSchema.index({ slug: 1 }, { unique: true });
 sellerSchema.index({ status: 1 });
 
 module.exports = mongoose.model("Seller", sellerSchema);
