@@ -63,7 +63,7 @@ const registerSeller = async (req, res) => {
     // Update user role to seller
     user.role = "seller";
     await user.save();
-
+    
     res.status(201).json({
       message: "Seller registration submitted",
       data: {
@@ -197,7 +197,7 @@ const getSellerDashboard = async (req, res) => {
     const seller = await Seller.findOne({ user: req.user._id });
     if (!seller) return res.status(404).json({ message: "Seller not found" });
 
-    const books = await Book.find({ seller: req.user._id });
+    const books = await Book.find({ seller: seller._id });
 
     const filteredBooks = books.map((book) => {
       const salesHistory = book.salesHistory.filter((sh) => {
@@ -240,6 +240,7 @@ const getSellerDashboard = async (req, res) => {
     );
 
     res.json({
+      
       books: filteredBooks,
       totalRevenue,
       totalUnits,

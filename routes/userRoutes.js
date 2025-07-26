@@ -14,6 +14,14 @@ const {
   getFcmTokens,
 } = require("../controllers/userController");
 const { getReferralStats } = require("../controllers/authController");
+const {
+  followUser,
+  unfollowUser,
+  getFollowers,
+  getFollowing,
+  checkFollowStatus,
+  getSuggestedUsers,
+} = require("../controllers/followController");
 
 const router = express.Router();
 
@@ -35,5 +43,13 @@ router.put("/:id/suspend", protect, admin, suspendUser); // Suspend a user
 router.post("/fcm-tokens", protect, updateFcmToken);
 router.delete("/fcm-tokens", protect, removeFcmToken);
 router.get("/fcm-tokens", protect, getFcmTokens);
+
+// Follow Routes
+router.post("/:id/follow", protect, followUser);
+router.post("/:id/unfollow", protect, unfollowUser);
+router.get("/:id/followers", protect, getFollowers);
+router.get("/:id/following", protect, getFollowing);
+router.get("/:userId/follow-status", protect, checkFollowStatus);
+router.get("/suggested", protect, getSuggestedUsers);
 
 module.exports = router;
