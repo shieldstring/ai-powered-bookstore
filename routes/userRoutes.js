@@ -47,8 +47,13 @@ router.get("/fcm-tokens", protect, getFcmTokens);
 // Follow Routes
 router.post("/:id/follow", protect, followUser);
 router.post("/:id/unfollow", protect, unfollowUser);
-router.get("/:id/followers", protect, getFollowers);
-router.get("/:id/following", protect, getFollowing);
+
+router.get("/:id/followers", protect, getFollowers); // GET followers of user by ID
+router.get("/:id/following", protect, getFollowing); // GET following of user by ID
+
+// OR use these for current user
+router.get("/me/followers", protect, getFollowers); // GET your followers
+router.get("/me/following", protect, getFollowing); // GET who you follow
 router.get("/:userId/follow-status", protect, checkFollowStatus);
 router.get("/suggested", protect, getSuggestedUsers);
 

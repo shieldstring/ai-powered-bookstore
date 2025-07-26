@@ -113,10 +113,13 @@ exports.unfollowUser = async (req, res) => {
 // Get followers of a user
 exports.getFollowers = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).populate(
+    const userId = req.params.id === "me" ? req.user._id : req.params.id;
+
+    const user = await User.findById(userId).populate(
       "followers",
-      "name email role"
-    ); // adjust fields
+      "name email avatar"
+    );
+
     if (!user) return res.status(404).json({ msg: "User not found" });
 
     res.json({ followers: user.followers });
@@ -129,10 +132,13 @@ exports.getFollowers = async (req, res) => {
 // Get following of a user
 exports.getFollowing = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).populate(
+    const userId = req.params.id === "me" ? req.user._id : req.params.id;
+
+    const user = await User.findById(userId).populate(
       "following",
-      "name email role"
+      "name email avatar"
     );
+
     if (!user) return res.status(404).json({ msg: "User not found" });
 
     res.json({ following: user.following });
