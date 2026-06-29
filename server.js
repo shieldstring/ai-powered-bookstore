@@ -66,6 +66,7 @@ require("./config/passport");
 const authRoutes = require("./routes/authRoutes");
 const bookRoutes = require("./routes/bookRoutes");
 const courseRoutes = require("./routes/courseRoutes");
+const blogRoutes = require("./routes/blogRoutes");
 const groupRoutes = require("./routes/groupRoutes");
 const postRoutes = require("./routes/postRoutes");
 const mlmRoutes = require("./routes/mlmRoutes");
@@ -89,6 +90,7 @@ const enrollmentRoutes = require("./routes/enrollmentRoutes");
 app.use("/api/auth", authRoutes); // Authentication routes
 app.use("/api/books", bookRoutes); // Book-related routes
 app.use("/api/courses", courseRoutes); // Course-related routes
+app.use("/api/blogs", blogRoutes); // Blog-related routes
 app.use("/api/groups", groupRoutes); // Group-related routes
 app.use("/api/posts", postRoutes); // Post-related routes
 app.use("/api/mlm", protect, mlmRoutes); // MLM-related routes
