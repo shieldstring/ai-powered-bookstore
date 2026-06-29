@@ -152,6 +152,32 @@ const handleWebhook = async (req, res) => {
               email_address: session.customer_details?.email || "",
             };
             await order.save();
+
+            // Auto-enroll user in courses
+            try {
+              const Enrollment = require("../models/Enrollment");
+              const populatedOrder = await Order.findById(order._id).populate("orderItems.book");
+              for (const item of populatedOrder.orderItems) {
+                const book = item.book;
+                if (book && book.format === "Course") {
+                  const existingEnrollment = await Enrollment.findOne({
+                    user: order.user,
+                    course: book._id,
+                  });
+                  if (!existingEnrollment) {
+                    await Enrollment.create({
+                      user: order.user,
+                      course: book._id,
+                      completedLessons: [],
+                      completed: false,
+                    });
+                    console.log(`Auto-enrolled user ${order.user} in course ${book._id} via Webhook`);
+                  }
+                }
+              }
+            } catch (err) {
+              console.error("Webhook enrollment error:", err);
+            }
           }
         }
       }

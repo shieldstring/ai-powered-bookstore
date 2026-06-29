@@ -47,6 +47,39 @@ const salesHistorySchema = new mongoose.Schema({
   },
 });
 
+const lessonSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: [true, "Lesson title is required"],
+    trim: true,
+  },
+  content: {
+    type: String,
+    trim: true,
+  },
+  videoUrl: {
+    type: String,
+    trim: true,
+  },
+  pdfUrl: {
+    type: String,
+    trim: true,
+  },
+  duration: {
+    type: String,
+    trim: true,
+  },
+});
+
+const sectionSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: [true, "Section title is required"],
+    trim: true,
+  },
+  lessons: [lessonSchema],
+});
+
 const bookSchema = new mongoose.Schema(
   {
     title: {
@@ -91,9 +124,14 @@ const bookSchema = new mongoose.Schema(
     isbn: {
       type: String,
       unique: true,
-      required: [true, "ISBN is required"],
+      required: function() {
+        return this.format !== "Course";
+      },
       validate: {
         validator: function (v) {
+          if (this.format === "Course") {
+            return !v || v.startsWith("COURSE-") || /^(?:\d{9}[\dXx]|\d{13})$/.test(v);
+          }
           return /^(?:\d{9}[\dXx]|\d{13})$/.test(v);
         },
         message: (props) => `${props.value} is not a valid ISBN!`,
@@ -118,7 +156,7 @@ const bookSchema = new mongoose.Schema(
     format: {
       type: String,
       enum: {
-        values: ["Paperback", "Hardcover", "E-book", "Audiobook"],
+        values: ["Paperback", "Hardcover", "E-book", "Audiobook", "Course"],
         message: "{VALUE} is not a supported format",
       },
       default: "Paperback",
@@ -246,6 +284,10 @@ const bookSchema = new mongoose.Schema(
       type: Number,
       min: [0, "Weight cannot be negative"],
     },
+    sections: {
+      type: [sectionSchema],
+      default: [],
+    },
   },
   {
     timestamps: true,
@@ -298,14 +340,23 @@ bookSchema.virtual("availability").get(function () {
 
 // Check inventory before saving
 bookSchema.pre("save", function (next) {
+  if (this.format === "Course" && !this.isbn) {
+    this.isbn = `COURSE-${this._id || new mongoose.Types.ObjectId()}`;
+  }
+
   if (this.isModified("inventory")) {
-    if (this.inventory < 0) {
-      throw new Error("Inventory cannot be negative");
-    }
-    // Automatically deactivate if inventory is 0
-    if (this.inventory === 0 && this.isActive) {
-      this.isActive = false;
-    } else if (this.inventory > 0 && !this.isActive) {
+    if (this.format !== "Course") {
+      if (this.inventory < 0) {
+        throw new Error("Inventory cannot be negative");
+      }
+      // Automatically deactivate if inventory is 0
+      if (this.inventory === 0 && this.isActive) {
+        this.isActive = false;
+      } else if (this.inventory > 0 && !this.isActive) {
+        this.isActive = true;
+      }
+    } else {
+      this.inventory = 99999;
       this.isActive = true;
     }
   }

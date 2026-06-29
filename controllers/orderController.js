@@ -3,6 +3,7 @@ const Order = require("../models/Order");
 const Cart = require("../models/Cart");
 const Book = require("../models/Book");
 const Transaction = require("../models/Transaction");
+const Enrollment = require("../models/Enrollment");
 const Stripe = require("stripe");
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
@@ -390,6 +391,36 @@ const deleteOrder = async (req, res) => {
   }
 };
 
+// Enroll user in any courses purchased in an order
+const enrollUserInPurchasedCourses = async (orderId, userId) => {
+  try {
+    const order = await Order.findById(orderId).populate("orderItems.book");
+    if (!order) return;
+
+    for (const item of order.orderItems) {
+      const book = item.book;
+      if (book && book.format === "Course") {
+        const existingEnrollment = await Enrollment.findOne({
+          user: userId,
+          course: book._id,
+        });
+
+        if (!existingEnrollment) {
+          await Enrollment.create({
+            user: userId,
+            course: book._id,
+            completedLessons: [],
+            completed: false,
+          });
+          console.log(`Auto-enrolled user ${userId} in course ${book._id}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("Error auto-enrolling user in courses:", error);
+  }
+};
+
 // Verify Payment
 const verifyPayment = async (req, res) => {
   const { sessionId, orderId } = req.body;
@@ -420,6 +451,7 @@ const verifyPayment = async (req, res) => {
       };
 
       await order.save();
+      await enrollUserInPurchasedCourses(order._id, order.user);
 
       await Transaction.findOneAndUpdate(
         { checkoutSessionId: session.id },

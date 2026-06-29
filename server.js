@@ -82,6 +82,7 @@ const orderRoutes = require("./routes/orderRoutes"); // Order routes
 const userRoutes = require("./routes/userRoutes"); // User routes
 const notificationRoutes = require("./routes/notificationRoutes");
 const sellerRoutes = require("./routes/sellerRoutes");
+const enrollmentRoutes = require("./routes/enrollmentRoutes");
 
 // Use Routes
 app.use("/api/auth", authRoutes); // Authentication routes
@@ -103,6 +104,7 @@ app.use("/api/orders", protect, orderRoutes); // Order routes
 app.use("/api/users", protect, userRoutes); // User routes
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/seller", sellerRoutes);
+app.use("/api/enrollments", enrollmentRoutes);
 
 // Socket.IO for real-time communication
 io.on("connection", (socket) => {
