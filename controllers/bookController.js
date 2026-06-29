@@ -309,10 +309,13 @@ const getSellerBooks = async (req, res) => {
       });
     }
 
-    const books = await Book.find({
+    const filters = {
       seller: req.user._id,
       isActive: true,
-    }).lean();
+      ...(req.query.format && { format: req.query.format }),
+    };
+
+    const books = await Book.find(filters).lean();
 
     res.json({
       success: true,
