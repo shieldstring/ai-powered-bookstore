@@ -65,10 +65,21 @@ const lessonSchema = new mongoose.Schema({
     type: String,
     trim: true,
   },
+  imageUrl: {
+    type: String,
+    trim: true,
+  },
   duration: {
     type: String,
     trim: true,
   },
+  questions: [
+    {
+      question: { type: String, trim: true },
+      options: [{ type: String, trim: true }],
+      correctIndex: { type: Number, default: 0 },
+    },
+  ],
 });
 
 const sectionSchema = new mongoose.Schema({
