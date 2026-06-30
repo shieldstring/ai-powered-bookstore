@@ -27,9 +27,19 @@ const orderSchema = new mongoose.Schema(
       postalCode: { type: String, required: true },
       country: { type: String, required: true },
     },
+    currency: {
+      type: String,
+      default: "GBP",
+      uppercase: true,
+    },
+    exchangeRate: {
+      type: Number,
+      default: 1,
+    },
     paymentMethod: {
       type: String,
       required: true,
+      default: "paypal",
     },
     paymentResult: {
       id: { type: String },

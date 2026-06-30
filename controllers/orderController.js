@@ -4,8 +4,14 @@ const Cart = require("../models/Cart");
 const Book = require("../models/Book");
 const Transaction = require("../models/Transaction");
 const Enrollment = require("../models/Enrollment");
-const Stripe = require("stripe");
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const {
+  normalizeCurrency,
+  convertFromBase,
+  getExchangeRates,
+  BASE_CURRENCY,
+  roundPrice,
+} = require("../utils/currency");
+const { capturePayPalOrder } = require("../utils/paypal");
 
 // Helpers
 const isAdminOrSeller = (user) =>
@@ -30,32 +36,42 @@ const validateStatusTransition = (current, next) => {
 
 // Create Order
 const createOrder = async (req, res) => {
-  const { orderItems, paymentResult } = req.body;
+  const { orderItems, paymentResult, currency = BASE_CURRENCY } = req.body;
 
   if (!orderItems || orderItems.length === 0) {
     return res.status(400).json({ message: "No order items" });
   }
+
+  const orderCurrency = normalizeCurrency(currency);
+  const rates = getExchangeRates();
+  const exchangeRate = orderCurrency === BASE_CURRENCY ? 1 : rates[orderCurrency];
 
   try {
     const enhancedItems = await Promise.all(
       orderItems.map(async (item) => {
         const book = await Book.findById(item.book).lean();
         if (!book) throw new Error(`Book ${item.book} not found`);
-        if (book.countInStock < item.quantity) {
-          throw new Error(`Insufficient stock for ${book.name}`);
+        if (book.format !== "Course" && book.inventory < item.quantity) {
+          throw new Error(`Insufficient stock for ${book.title}`);
         }
+
+        const priceInCurrency = convertFromBase(book.price, orderCurrency);
 
         return {
           book: item.book,
           seller: book.seller || null,
-          name: book.name,
+          name: book.title,
           image: book.image,
-          price: book.price,
+          price: priceInCurrency,
           quantity: item.quantity,
           sellerStatus: "pending",
           statusUpdatedAt: new Date(),
         };
       })
+    );
+
+    const itemsPrice = roundPrice(
+      enhancedItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
     );
 
     const session = await mongoose.startSession();
@@ -67,16 +83,20 @@ const createOrder = async (req, res) => {
         orderItems: enhancedItems,
         user: req.user._id,
         status: "pending",
+        currency: orderCurrency,
+        exchangeRate,
+        itemsPrice,
+        totalPrice: itemsPrice,
+        paymentMethod: req.body.paymentMethod || "paypal",
       });
 
       const savedOrder = await order.save({ session });
 
       for (const item of orderItems) {
-        await Book.findByIdAndUpdate(
-          item.book,
-          { $inc: { countInStock: -item.quantity } },
-          { session }
-        );
+        const book = await Book.findById(item.book);
+        if (book && book.format !== "Course") {
+          await book.updateInventory(-item.quantity, savedOrder._id);
+        }
       }
 
       if (paymentResult?.id && paymentResult.id !== "simulated_payment_id") {
@@ -87,11 +107,13 @@ const createOrder = async (req, res) => {
         );
       }
 
-      await Cart.findOneAndUpdate(
-        { user: req.user._id },
-        { $set: { items: [] } },
-        { session }
-      );
+      if (savedOrder.isPaid) {
+        await Cart.findOneAndUpdate(
+          { user: req.user._id },
+          { $set: { items: [] } },
+          { session }
+        );
+      }
 
       await session.commitTransaction();
       session.endSession();
@@ -310,22 +332,16 @@ const cancelOrder = async (req, res) => {
           if (item.sellerStatus !== "canceled") {
             item.sellerStatus = "canceled";
             item.canceledAt = new Date();
-            await Book.findByIdAndUpdate(
-              item.book,
-              { $inc: { countInStock: item.quantity } },
-              { session }
-            );
+            const book = await Book.findById(item.book);
+            if (book) await book.updateInventory(item.quantity, order._id);
           }
         }
       } else if (req.user.role === "admin") {
         for (const item of order.orderItems) {
           if (item.sellerStatus !== "canceled") {
             item.sellerStatus = "canceled";
-            await Book.findByIdAndUpdate(
-              item.book,
-              { $inc: { countInStock: item.quantity } },
-              { session }
-            );
+            const book = await Book.findById(item.book);
+            if (book) await book.updateInventory(item.quantity, order._id);
           }
         }
         order.cancellationReason = reason || "Canceled by admin";
@@ -421,52 +437,58 @@ const enrollUserInPurchasedCourses = async (orderId, userId) => {
   }
 };
 
-// Verify Payment
+// Verify Payment (PayPal)
 const verifyPayment = async (req, res) => {
-  const { sessionId, orderId } = req.body;
+  const { paypalOrderId, orderId, sessionId } = req.body;
+  const paymentId = paypalOrderId || sessionId;
 
-  if (!sessionId || !orderId) {
-    return res.status(400).json({ message: "Missing session ID or order ID" });
+  if (!paymentId || !orderId) {
+    return res.status(400).json({ message: "Missing payment ID or order ID" });
   }
 
   try {
     const order = await getOrderOrFail(orderId);
 
+    if (order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
     if (order.isPaid) {
-      return res.status(400).json({ message: "Order already paid" });
+      return res.json({ message: "Order already paid", order });
     }
 
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const captureResult = await capturePayPalOrder(paymentId);
+    const capture = captureResult.purchase_units?.[0]?.payments?.captures?.[0];
 
-    if (session.payment_status === "paid") {
-      order.isPaid = true;
-      order.paidAt = new Date();
-      order.status = "processing";
-      order.paymentResult = {
-        id: session.id,
-        status: session.payment_status,
-        update_time: new Date().toISOString(),
-        email_address: session.customer_details?.email || "",
-        payment_intent: session.payment_intent || "",
-      };
-
-      await order.save();
-      await enrollUserInPurchasedCourses(order._id, order.user);
-
-      await Transaction.findOneAndUpdate(
-        { checkoutSessionId: session.id },
-        { status: "completed", orderId: order._id }
-      );
-
-      await Cart.findOneAndUpdate(
-        { user: req.user._id },
-        { $set: { items: [] } }
-      );
-
-      return res.json({ message: "Payment verified", order });
+    if (captureResult.status !== "COMPLETED" || !capture) {
+      return res.status(400).json({ message: "Payment not completed" });
     }
 
-    res.status(400).json({ message: "Payment not completed" });
+    order.isPaid = true;
+    order.paidAt = new Date();
+    order.status = "processing";
+    order.paymentResult = {
+      id: capture.id,
+      status: capture.status,
+      update_time: new Date().toISOString(),
+      email_address: captureResult.payer?.email_address || "",
+      paypal_order_id: paymentId,
+    };
+
+    await order.save();
+    await enrollUserInPurchasedCourses(order._id, order.user);
+
+    await Transaction.findOneAndUpdate(
+      { paypalOrderId: paymentId },
+      { status: "completed", orderId: order._id }
+    );
+
+    await Cart.findOneAndUpdate(
+      { user: req.user._id },
+      { $set: { items: [] } }
+    );
+
+    return res.json({ message: "Payment verified", order });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -517,4 +539,5 @@ module.exports = {
   deleteOrder,
   verifyPayment,
   getOrderStatusSummary,
+  enrollUserInPurchasedCourses,
 };

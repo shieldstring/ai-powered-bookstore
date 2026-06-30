@@ -1,215 +1,204 @@
-const Stripe = require("stripe");
-const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const Transaction = require("../models/Transaction");
-const { v4: uuidv4 } = require('uuid'); // Make sure to have this for idempotency
+const Order = require("../models/Order");
+const {
+  normalizeCurrency,
+  formatPayPalAmount,
+  BASE_CURRENCY,
+} = require("../utils/currency");
+const {
+  createPayPalOrder,
+  capturePayPalOrder,
+  getPayPalOrder,
+} = require("../utils/paypal");
 
-// Create a checkout session
-const createCheckoutSession = async (req, res) => {
-  const { amount, currency = 'usd', items, cartId, successUrl, cancelUrl } = req.body;
-  
+const createPayPalCheckout = async (req, res) => {
+  const { orderId, currency = BASE_CURRENCY, successUrl, cancelUrl } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ message: "Order ID is required" });
+  }
+
   try {
-    // Validate amount based on currency
-    const minimumAmounts = {
-      usd: 50,    // $0.50
-      eur: 50,    // €0.50
-      gbp: 30,    // £0.30
-      // Add other supported currencies
-    };
-
-    const minimumAmount = minimumAmounts[currency.toLowerCase()] || 50;
-    
-    if (amount < minimumAmount) {
-      return res.status(400).json({
-        message: `Minimum payment amount is ${minimumAmount/100} ${currency.toUpperCase()}`
-      });
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
     }
 
-    // Add idempotency key to prevent duplicate sessions
-    const idempotencyKey = req.headers['idempotency-key'] || uuidv4();
+    if (order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
 
-    // Format line items for Checkout
-    const lineItems = items ? items : [
-      {
-        price_data: {
-          currency,
-          product_data: {
-            name: "Your purchase",
-          },
-          unit_amount: amount,
-        },
-        quantity: 1,
-      }
-    ];
+    if (order.isPaid) {
+      return res.status(400).json({ message: "Order is already paid" });
+    }
 
-    // Create the checkout session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: lineItems,
-      mode: 'payment',
-      success_url: successUrl || `${process.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${process.env.FRONTEND_URL}/payment/cancel`,
-      metadata: { 
-        userId: req.user._id.toString(),
-        cartId: cartId || null
-      },
-    }, {
-      idempotencyKey
+    const checkoutCurrency = normalizeCurrency(currency || order.currency);
+    const amount = formatPayPalAmount(order.totalPrice);
+
+    const items = order.orderItems.map((item) => ({
+      name: item.name,
+      quantity: item.quantity,
+      unitAmount: formatPayPalAmount(item.price),
+    }));
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
+    const paypalOrder = await createPayPalOrder({
+      orderId: order._id.toString(),
+      amount,
+      currency: checkoutCurrency,
+      items,
+      returnUrl:
+        successUrl ||
+        `${frontendUrl}/checkout/success?order_id=${order._id}`,
+      cancelUrl: cancelUrl || `${frontendUrl}/cart`,
     });
 
-    // Log transaction
     await Transaction.create({
       user: req.user._id,
-      amount: amount / 100,
-      currency,
+      amount: order.totalPrice,
+      currency: checkoutCurrency,
       type: "purchase",
       status: "pending",
-      checkoutSessionId: session.id
+      paypalOrderId: paypalOrder.id,
+      orderId: order._id,
     });
 
-    // Return the session URL - client will redirect to this URL
+    order.paymentResult = {
+      id: paypalOrder.id,
+      status: "pending",
+      update_time: new Date().toISOString(),
+      email_address: req.user.email || "",
+    };
+    await order.save();
+
     res.json({
-      sessionId: session.id,
-      url: session.url
+      paypalOrderId: paypalOrder.id,
+      approvalUrl: paypalOrder.approvalUrl,
     });
   } catch (error) {
-    console.error("Checkout session error:", error);
+    console.error("PayPal checkout error:", error.response?.data || error.message);
     res.status(500).json({
-      message: error.message || "Payment processing error"
+      message: error.response?.data?.message || error.message || "PayPal checkout failed",
     });
   }
 };
 
-// Get checkout session status
-const getCheckoutStatus = async (req, res) => {
-  const { sessionId } = req.params;
+const capturePayPalPayment = async (req, res) => {
+  const { paypalOrderId, orderId } = req.body;
+
+  if (!paypalOrderId || !orderId) {
+    return res.status(400).json({ message: "PayPal order ID and order ID are required" });
+  }
 
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-    // Find if this session is associated with an order
-    const transaction = await Transaction.findOne({
-      checkoutSessionId: sessionId,
-    });
-    let orderId = null;
-
-    if (transaction && transaction.orderId) {
-      orderId = transaction.orderId;
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: "Order not found" });
     }
 
-    res.json({
-      status: session.payment_status,
-      orderId,
-    });
+    if (order.user.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
+    if (order.isPaid) {
+      return res.json({ message: "Order already paid", order });
+    }
+
+    const captureResult = await capturePayPalOrder(paypalOrderId);
+    const capture = captureResult.purchase_units?.[0]?.payments?.captures?.[0];
+
+    if (captureResult.status !== "COMPLETED" || !capture) {
+      return res.status(400).json({ message: "Payment was not completed" });
+    }
+
+    order.isPaid = true;
+    order.paidAt = new Date();
+    order.status = "processing";
+    order.paymentResult = {
+      id: capture.id,
+      status: capture.status,
+      update_time: new Date().toISOString(),
+      email_address: captureResult.payer?.email_address || "",
+      paypal_order_id: paypalOrderId,
+    };
+    await order.save();
+
+    const { enrollUserInPurchasedCourses } = require("./orderController");
+    await enrollUserInPurchasedCourses(order._id, order.user);
+
+    await Transaction.findOneAndUpdate(
+      { paypalOrderId },
+      { status: "completed", orderId: order._id }
+    );
+
+    const Cart = require("../models/Cart");
+    await Cart.findOneAndUpdate({ user: req.user._id }, { $set: { items: [] } });
+
+    res.json({ message: "Payment captured", order });
   } catch (error) {
-    console.error("Error retrieving checkout status:", error);
-    res.status(500).json({ message: "Error retrieving checkout status" });
+    console.error("PayPal capture error:", error.response?.data || error.message);
+    res.status(500).json({
+      message: error.response?.data?.message || error.message || "Failed to capture payment",
+    });
   }
 };
 
-// Handle webhook events from Stripe
-const handleWebhook = async (req, res) => {
-  const signature = req.headers["stripe-signature"];
-  let event;
+const getPayPalCheckoutStatus = async (req, res) => {
+  const { paypalOrderId } = req.params;
 
   try {
-    // Verify the event came from Stripe
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error("Webhook signature verification failed:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    const paypalOrder = await getPayPalOrder(paypalOrderId);
+    const transaction = await Transaction.findOne({ paypalOrderId });
+
+    res.json({
+      status: paypalOrder.status,
+      orderId: transaction?.orderId || null,
+    });
+  } catch (error) {
+    console.error("PayPal status error:", error.response?.data || error.message);
+    res.status(500).json({ message: "Error retrieving PayPal checkout status" });
   }
+};
 
-  // Handle specific events
-  switch (event.type) {
-    case "checkout.session.completed":
-      const session = event.data.object;
-      console.log("Checkout session completed:", session.id);
+const handlePayPalWebhook = async (req, res) => {
+  const event = req.body;
+  console.log("PayPal webhook received:", event?.event_type);
 
-      // Update transaction status
-      const transaction = await Transaction.findOne({
-        checkoutSessionId: session.id,
-      });
-      
-      if (transaction) {
-        transaction.status = "completed";
-        await transaction.save();
-        
-        // If transaction is linked to an order, update it
-        if (transaction.orderId) {
-          const Order = require("../models/Order");
-          const order = await Order.findById(transaction.orderId);
-          if (order) {
-            order.isPaid = true;
-            order.paidAt = Date.now();
-            order.paymentResult = {
-              id: session.id,
-              status: "completed",
-              update_time: new Date().toISOString(),
-              email_address: session.customer_details?.email || "",
-            };
-            await order.save();
+  if (event?.event_type === "CHECKOUT.ORDER.APPROVED") {
+    const paypalOrderId = event.resource?.id;
+    if (paypalOrderId) {
+      const transaction = await Transaction.findOne({ paypalOrderId });
+      if (transaction && transaction.status === "pending") {
+        try {
+          await capturePayPalOrder(paypalOrderId);
+          transaction.status = "completed";
+          await transaction.save();
 
-            // Auto-enroll user in courses
-            try {
-              const Enrollment = require("../models/Enrollment");
-              const populatedOrder = await Order.findById(order._id).populate("orderItems.book");
-              for (const item of populatedOrder.orderItems) {
-                const book = item.book;
-                if (book && book.format === "Course") {
-                  const existingEnrollment = await Enrollment.findOne({
-                    user: order.user,
-                    course: book._id,
-                  });
-                  if (!existingEnrollment) {
-                    await Enrollment.create({
-                      user: order.user,
-                      course: book._id,
-                      completedLessons: [],
-                      completed: false,
-                    });
-                    console.log(`Auto-enrolled user ${order.user} in course ${book._id} via Webhook`);
-                  }
-                }
-              }
-            } catch (err) {
-              console.error("Webhook enrollment error:", err);
+          if (transaction.orderId) {
+            const order = await Order.findById(transaction.orderId);
+            if (order && !order.isPaid) {
+              order.isPaid = true;
+              order.paidAt = new Date();
+              order.status = "processing";
+              await order.save();
+
+              const { enrollUserInPurchasedCourses } = require("./orderController");
+              await enrollUserInPurchasedCourses(order._id, order.user);
             }
           }
+        } catch (err) {
+          console.error("Webhook capture error:", err.message);
         }
       }
-      break;
-
-    case "checkout.session.expired":
-      const expiredSession = event.data.object;
-      console.log("Checkout session expired:", expiredSession.id);
-      
-      // Update transaction status
-      const expiredTransaction = await Transaction.findOne({
-        checkoutSessionId: expiredSession.id,
-      });
-      
-      if (expiredTransaction) {
-        expiredTransaction.status = "expired";
-        await expiredTransaction.save();
-      }
-      break;
-      
-
-
-    default:
-      console.log(`Unhandled event type: ${event.type}`);
+    }
   }
 
   res.status(200).json({ received: true });
 };
 
-
 module.exports = {
-  createCheckoutSession,
-  getCheckoutStatus,
-  handleWebhook,
+  createPayPalCheckout,
+  capturePayPalPayment,
+  getPayPalCheckoutStatus,
+  handlePayPalWebhook,
 };

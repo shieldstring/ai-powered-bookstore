@@ -11,6 +11,21 @@ const transactionSchema = mongoose.Schema(
       type: Number,
       required: true,
     },
+    currency: {
+      type: String,
+      default: "GBP",
+      uppercase: true,
+    },
+    orderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
+    },
+    paypalOrderId: {
+      type: String,
+    },
+    checkoutSessionId: {
+      type: String,
+    },
     type: {
       type: String,
       enum: [

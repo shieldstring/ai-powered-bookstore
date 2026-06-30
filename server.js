@@ -85,6 +85,7 @@ const userRoutes = require("./routes/userRoutes"); // User routes
 const notificationRoutes = require("./routes/notificationRoutes");
 const sellerRoutes = require("./routes/sellerRoutes");
 const enrollmentRoutes = require("./routes/enrollmentRoutes");
+const currencyRoutes = require("./routes/currencyRoutes");
 
 // Use Routes
 app.use("/api/auth", authRoutes); // Authentication routes
@@ -94,7 +95,8 @@ app.use("/api/blogs", blogRoutes); // Blog-related routes
 app.use("/api/groups", groupRoutes); // Group-related routes
 app.use("/api/posts", postRoutes); // Post-related routes
 app.use("/api/mlm", protect, mlmRoutes); // MLM-related routes
-app.use("/api/payment", protect, paymentRoutes); // Payment-related routes
+app.use("/api/currency", currencyRoutes);
+app.use("/api/payment", paymentRoutes);
 app.use("/api/leaderboard", leaderboardRoutes); // Leaderboard routes
 app.use("/api/challenges", challengeRoutes); // Challenge routes
 app.use("/api/messages", protect, messageRoutes); // Private messaging routes

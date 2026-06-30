@@ -108,10 +108,12 @@ const bookSchema = new mongoose.Schema(
       type: Number,
       required: [true, "Price is required"],
       min: [0, "Price cannot be negative"],
-      set: (v) => Math.round(v), // Ensure whole numbers
+      max: [999.99, "Price cannot exceed £999.99"],
+      set: (v) => Math.round(v * 100) / 100,
     },
     originalPrice: {
       type: Number,
+      max: [999.99, "Original price cannot exceed £999.99"],
       validate: {
         validator: function (value) {
           return !value || value >= this.price;
@@ -119,7 +121,12 @@ const bookSchema = new mongoose.Schema(
         message:
           "Original price must be greater than or equal to current price",
       },
-      set: (v) => (v ? Math.round(v) : v),
+      set: (v) => (v ? Math.round(v * 100) / 100 : v),
+    },
+    baseCurrency: {
+      type: String,
+      default: "GBP",
+      uppercase: true,
     },
     isbn: {
       type: String,
@@ -221,6 +228,12 @@ const bookSchema = new mongoose.Schema(
           "Comics & Graphic Novels",
           "Education",
           "Reference",
+          "Faith & Theology",
+          "Psychology & Mindset",
+          "Life Strategy & Purpose",
+          "Business & Finance",
+          "Leadership & Management",
+          "General",
         ],
         message: "{VALUE} is not a valid category",
       },

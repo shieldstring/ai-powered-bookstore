@@ -1,5 +1,6 @@
 const Book = require("../models/Book");
 const mongoose = require("mongoose");
+const { applyCurrencyToBook, applyCurrencyToBooks, normalizeCurrency } = require("../utils/currency");
 
 // Configuration for recommendation service
 const RECOMMENDATION_SERVICE_URL =
@@ -72,6 +73,8 @@ const getBooks = async (req, res) => {
         sortOption = { createdAt: -1 };
     }
 
+    const currency = normalizeCurrency(req.query.currency);
+
     // Get total count and books
     const [total, books] = await Promise.all([
       Book.countDocuments(filters),
@@ -89,7 +92,8 @@ const getBooks = async (req, res) => {
       total,
       page,
       pages: Math.ceil(total / limit),
-      data: books,
+      currency,
+      data: applyCurrencyToBooks(books, currency),
     });
   } catch (error) {
     console.error("Error fetching books:", error);
@@ -125,9 +129,13 @@ const getBookById = async (req, res) => {
     // Safe increment of view count
     await Book.updateOne({ _id: book._id }, { $inc: { viewCount: 1 } });
 
+    const currency = normalizeCurrency(req.query.currency);
+    const bookData = applyCurrencyToBook(book.toObject(), currency);
+
     res.json({
       success: true,
-      data: book,
+      currency,
+      data: bookData,
     });
   } catch (error) {
     console.error("Error fetching book:", error);

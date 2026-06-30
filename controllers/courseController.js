@@ -1,5 +1,6 @@
 const Book = require("../models/Book");
 const mongoose = require("mongoose");
+const { applyCurrencyToBook, applyCurrencyToBooks, normalizeCurrency } = require("../utils/currency");
 
 // Helper function for pagination
 const getPaginationOptions = (query) => ({
@@ -46,6 +47,8 @@ const getCourses = async (req, res) => {
         sortOption = { createdAt: -1 };
     }
 
+    const currency = normalizeCurrency(req.query.currency);
+
     const [total, courses] = await Promise.all([
       Book.countDocuments(filters),
       Book.find(filters)
@@ -62,7 +65,8 @@ const getCourses = async (req, res) => {
       total,
       page,
       pages: Math.ceil(total / limit),
-      data: courses,
+      currency,
+      data: applyCurrencyToBooks(courses, currency),
     });
   } catch (error) {
     console.error("Error fetching courses:", error);
@@ -94,9 +98,13 @@ const getCourseById = async (req, res) => {
       });
     }
 
+    const currency = normalizeCurrency(req.query.currency);
+    const courseData = applyCurrencyToBook(course.toObject(), currency);
+
     res.json({
       success: true,
-      data: course,
+      currency,
+      data: courseData,
     });
   } catch (error) {
     console.error("Error fetching course:", error);
