@@ -1,4 +1,9 @@
 const mongoose = require("mongoose");
+const {
+  generateProductIsbn,
+  isValidIsbn,
+  normalizeProvidedIsbn,
+} = require("../utils/generateProductIsbn");
 
 const reviewSchema = new mongoose.Schema(
   {
@@ -146,11 +151,7 @@ const bookSchema = new mongoose.Schema(
       trim: true,
       validate: {
         validator: function (v) {
-          if (!v) return true;
-          if (this.format === "Course") {
-            return v.startsWith("COURSE-") || /^(?:\d{9}[\dXx]|\d{13})$/.test(v);
-          }
-          return /^(?:\d{9}[\dXx]|\d{13})$/.test(v);
+          return isValidIsbn(v, this.format);
         },
         message: (props) => `${props.value} is not a valid ISBN!`,
       },
@@ -362,13 +363,19 @@ bookSchema.virtual("availability").get(function () {
   return "In Stock";
 });
 
+// Assign internal ISBN before validation when none provided
+bookSchema.pre("validate", function (next) {
+  const normalized = normalizeProvidedIsbn(this.isbn);
+  if (normalized) {
+    this.isbn = normalized;
+  } else if (this.isNew) {
+    this.isbn = generateProductIsbn(this.format, this._id);
+  }
+  next();
+});
+
 // Check inventory before saving
 bookSchema.pre("save", function (next) {
-  if (!this.isbn) {
-    const prefix = this.format === "Course" ? "COURSE" : "BOOK";
-    this.isbn = `${prefix}-${this._id || new mongoose.Types.ObjectId()}`;
-  }
-
   if (this.isModified("inventory")) {
     if (this.format !== "Course") {
       if (this.inventory < 0) {

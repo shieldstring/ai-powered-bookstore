@@ -176,12 +176,6 @@ const addBook = async (req, res) => {
       isActive: true,
     };
 
-    if (bookData.isbn) {
-      bookData.isbn = String(bookData.isbn).replace(/[-\s]/g, "");
-    } else {
-      delete bookData.isbn;
-    }
-
     if (bookData.format === "Course") {
       bookData.inventory = 99999;
     }
@@ -195,6 +189,7 @@ const addBook = async (req, res) => {
         id: book._id,
         title: book.title,
         author: book.author,
+        isbn: book.isbn,
         seller: book.seller || null,
       },
     });

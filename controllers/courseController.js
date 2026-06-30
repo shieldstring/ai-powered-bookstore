@@ -184,14 +184,6 @@ const addCourse = async (req, res) => {
       isActive: true,
     };
 
-    if (courseData.isbn) {
-      courseData.isbn = String(courseData.isbn).startsWith("COURSE-")
-        ? courseData.isbn
-        : `COURSE-${String(courseData.isbn).replace(/[-\s]/g, "")}`;
-    } else {
-      delete courseData.isbn;
-    }
-
     const course = await Book.create(courseData);
 
     res.status(201).json({
