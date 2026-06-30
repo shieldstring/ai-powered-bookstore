@@ -142,13 +142,13 @@ const bookSchema = new mongoose.Schema(
     isbn: {
       type: String,
       unique: true,
-      required: function() {
-        return this.format !== "Course";
-      },
+      sparse: true,
+      trim: true,
       validate: {
         validator: function (v) {
+          if (!v) return true;
           if (this.format === "Course") {
-            return !v || v.startsWith("COURSE-") || /^(?:\d{9}[\dXx]|\d{13})$/.test(v);
+            return v.startsWith("COURSE-") || /^(?:\d{9}[\dXx]|\d{13})$/.test(v);
           }
           return /^(?:\d{9}[\dXx]|\d{13})$/.test(v);
         },
@@ -364,8 +364,9 @@ bookSchema.virtual("availability").get(function () {
 
 // Check inventory before saving
 bookSchema.pre("save", function (next) {
-  if (this.format === "Course" && !this.isbn) {
-    this.isbn = `COURSE-${this._id || new mongoose.Types.ObjectId()}`;
+  if (!this.isbn) {
+    const prefix = this.format === "Course" ? "COURSE" : "BOOK";
+    this.isbn = `${prefix}-${this._id || new mongoose.Types.ObjectId()}`;
   }
 
   if (this.isModified("inventory")) {

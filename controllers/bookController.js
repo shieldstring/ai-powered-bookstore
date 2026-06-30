@@ -158,16 +158,9 @@ const addBook = async (req, res) => {
       });
     }
 
-    const { title, author, isbn, price, category, image } = req.body;
+    const { title, author, price, category, image } = req.body;
 
     if (!title || !author || !price || !category || !image) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields",
-      });
-    }
-
-    if (req.body.format !== "Course" && !isbn) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
@@ -183,10 +176,13 @@ const addBook = async (req, res) => {
       isActive: true,
     };
 
+    if (bookData.isbn) {
+      bookData.isbn = String(bookData.isbn).replace(/[-\s]/g, "");
+    } else {
+      delete bookData.isbn;
+    }
+
     if (bookData.format === "Course") {
-      bookData.isbn = bookData.isbn?.startsWith("COURSE-")
-        ? bookData.isbn
-        : `COURSE-${Date.now()}`;
       bookData.inventory = 99999;
     }
 
