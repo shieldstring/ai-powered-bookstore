@@ -2,6 +2,7 @@ const Book = require("../models/Book");
 const mongoose = require("mongoose");
 const { applyCurrencyToBook, applyCurrencyToBooks, normalizeCurrency } = require("../utils/currency");
 const { resolveProductSeller } = require("../utils/resolveProductSeller");
+const { normalizeProvidedIsbn } = require("../utils/generateProductIsbn");
 
 // Configuration for recommendation service
 const RECOMMENDATION_SERVICE_URL =
@@ -251,7 +252,7 @@ const updateBook = async (req, res) => {
       });
     }
 
-    const { seller: _ignoredSeller, ...body } = req.body;
+    const { seller: _ignoredSeller, isbn: bodyIsbn, ...body } = req.body;
 
     const updateData = {
       ...body,
@@ -259,6 +260,10 @@ const updateBook = async (req, res) => {
       originalPrice,
       updatedAt: new Date(),
     };
+
+    if (bodyIsbn !== undefined && String(bodyIsbn).trim()) {
+      updateData.isbn = normalizeProvidedIsbn(bodyIsbn);
+    }
 
     if (book.format === "Course") {
       updateData.inventory = 99999;
