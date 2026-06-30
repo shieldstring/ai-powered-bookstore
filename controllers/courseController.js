@@ -1,6 +1,7 @@
 const Book = require("../models/Book");
 const mongoose = require("mongoose");
 const { applyCurrencyToBook, applyCurrencyToBooks, normalizeCurrency } = require("../utils/currency");
+const { resolveProductSeller } = require("../utils/resolveProductSeller");
 
 // Helper function for pagination
 const getPaginationOptions = (query) => ({
@@ -156,6 +157,13 @@ const getSellerCourses = async (req, res) => {
 // Add a new course
 const addCourse = async (req, res) => {
   try {
+    if (!["admin", "seller"].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins and sellers can create courses",
+      });
+    }
+
     const { title, author, price, category, image, sections } = req.body;
 
     if (!title || !author || !price || !category || !image) {
@@ -165,20 +173,19 @@ const addCourse = async (req, res) => {
       });
     }
 
-    // Generate unique mock ISBN under the hood for courses
+    // Generate unique ISBN for courses
     const isbn = `COURSE-${Date.now()}`;
+    const seller = await resolveProductSeller(req);
+    const { seller: _ignoredSeller, isbn: _ignoredIsbn, ...body } = req.body;
 
     const courseData = {
-      ...req.body,
+      ...body,
       format: "Course",
       isbn,
-      inventory: 99999, // infinite stock
+      seller,
+      inventory: 99999,
       isActive: true,
     };
-
-    if (req.user.role === "seller") {
-      courseData.seller = req.user._id;
-    }
 
     const course = await Book.create(courseData);
 
@@ -200,6 +207,13 @@ const addCourse = async (req, res) => {
 // Update course details
 const updateCourse = async (req, res) => {
   try {
+    if (!["admin", "seller"].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins and sellers can update courses",
+      });
+    }
+
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -228,13 +242,19 @@ const updateCourse = async (req, res) => {
       });
     }
 
+    const { seller: _ignoredSeller, isbn: _ignoredIsbn, ...body } = req.body;
+
     const updateData = {
-      ...req.body,
-      format: "Course", // Enforce format remains Course
-      inventory: 99999, // Ensure inventory remains infinite
+      ...body,
+      format: "Course",
+      inventory: 99999,
       isActive: true,
       updatedAt: new Date(),
     };
+
+    if (!course.seller) {
+      updateData.seller = await resolveProductSeller(req);
+    }
 
     const updatedCourse = await Book.findByIdAndUpdate(
       id,

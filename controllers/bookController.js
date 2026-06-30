@@ -1,6 +1,7 @@
 const Book = require("../models/Book");
 const mongoose = require("mongoose");
 const { applyCurrencyToBook, applyCurrencyToBooks, normalizeCurrency } = require("../utils/currency");
+const { resolveProductSeller } = require("../utils/resolveProductSeller");
 
 // Configuration for recommendation service
 const RECOMMENDATION_SERVICE_URL =
@@ -150,23 +151,43 @@ const getBookById = async (req, res) => {
 // Add a new book (admin or seller)
 const addBook = async (req, res) => {
   try {
+    if (!["admin", "seller"].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only admins and sellers can add books",
+      });
+    }
+
     const { title, author, isbn, price, category, image } = req.body;
 
-    if (!title || !author || !isbn || !price || !category || !image) {
+    if (!title || !author || !price || !category || !image) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
     }
 
+    if (req.body.format !== "Course" && !isbn) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
+
+    const seller = await resolveProductSeller(req);
+    const { seller: _ignoredSeller, isbn: _ignoredIsbn, ...body } = req.body;
+
     const bookData = {
-      ...req.body,
+      ...body,
+      seller,
       isActive: true,
     };
 
-    // If user is a seller, attach seller ID
-    if (req.user.role === "seller") {
-      bookData.seller = req.user._id;
+    if (bookData.format === "Course") {
+      bookData.isbn = bookData.isbn?.startsWith("COURSE-")
+        ? bookData.isbn
+        : `COURSE-${Date.now()}`;
+      bookData.inventory = 99999;
     }
 
     const book = await Book.create(bookData);
@@ -239,14 +260,25 @@ const updateBook = async (req, res) => {
       });
     }
 
+    const { seller: _ignoredSeller, ...body } = req.body;
+
     const updateData = {
-      ...req.body,
+      ...body,
       price,
       originalPrice,
-      inventory: parseInt(req.body.inventory),
-      isActive: parseInt(req.body.inventory) > 0,
       updatedAt: new Date(),
     };
+
+    if (book.format === "Course") {
+      updateData.inventory = 99999;
+      updateData.isActive = true;
+      if (!book.seller) {
+        updateData.seller = await resolveProductSeller(req);
+      }
+    } else {
+      updateData.inventory = parseInt(req.body.inventory);
+      updateData.isActive = parseInt(req.body.inventory) > 0;
+    }
 
     Object.assign(book, updateData);
     await book.save();
